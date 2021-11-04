@@ -1,0 +1,71 @@
+// Program that generates a benford's law distribution from fibonacci numbers
+
+Func fibonacci n
+    if n == 0 Or n == 1 Then
+        Return n
+    Else
+        Return fibonacci n - 1 + fibonacci n - 2
+    End
+End
+
+Func firstDigit x 
+    While x > 9 
+        x = x /i 10
+    End
+    Return x
+End
+
+Func benfordsNoArrays n
+    ones = 0
+    twos = 0
+    threes = 0
+    fours = 0
+    fives = 0
+    sixes = 0
+    sevens = 0
+    eights = 0
+    nines = 0
+    For i = 1 To n Do
+        fib = fibonacci i
+        first = firstDigit i
+        If first == 1 Then
+            ones = ones + 1
+        End
+        If first == 2 Then
+            twos = twos + 1
+        End
+        If first == 3 Then
+            threes = threes + 1
+        End
+        If first == 4 Then  
+            fours = fours + 1
+        End 
+        If first == 5 Then 
+            fives = fives + 1
+        End
+        If first == 6 Then
+            sixes = sixes + 1
+        End
+        If first == 7 Then
+            sevens = sevens + 1
+        End
+        If first == 8 Then
+            eights = eights + 1
+        End
+        If first == 9 Then
+            nines = nines + 1
+        End
+    End
+    Say "1 ", ones / n
+    Say "2 ", twos / n
+    Say "3 ", threes / n
+    Say "4 ", fours / n
+    Say "5 ", fives / n
+    Say "6 ", sixes / n
+    Say "7 ", sevens / n
+    Say "8 ", eights / n
+    Say "9 ", nines / n
+End
+
+
+benfordsNoArrays 100

@@ -1,0 +1,17 @@
+// Program that prints out the first n fibonacci numbers
+
+Func fibonacci n
+    if n == 0 Or n == 1 Then
+        Return n
+    Else
+        Return fibonacci n - 1 + fibonacci n - 2
+    End
+End
+    
+
+
+Say "Enter the number of fibonacci numbers to generate:"
+n = In
+For i = 0 To n Do
+    Say fibonacci i
+End

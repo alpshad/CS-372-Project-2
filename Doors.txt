@@ -1,0 +1,34 @@
+// Program that emulates the 100 Doors problem
+
+Func hundredDoors
+    Say "Open Doors:"
+    i = 1
+    While i <= 10 Do
+        Say "Door ", i*i, " is open."
+    End
+End
+
+Func hundredDoorsArray
+    doors = []
+    For i = 1 To 100 Do
+        Push doors, 0
+    End
+    Say "Open Doors:"
+    For i = 1 To 100 Do
+        j = i
+        While j < 100 Do
+            doors[j] = Not doors[j]
+        End
+    End
+
+    For i = 1 To 100 Do
+        If doors[i] == 1 Then
+            Say "Door " + i + " is open."
+        End
+    End
+End
+        
+
+hundredDoors
+hundredDoorsArray
+

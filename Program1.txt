@@ -1,0 +1,24 @@
+//java translator Program1.txt -args 1 2 3 --> Run
+// For command line args, in translator.java, loop through after -agrs and store in ArrayList
+// Or just make it a complied language
+//javac translator.java --> translator
+
+Func calcMultiples x, y, m
+    count = 0
+    index = 0
+    While x * index <= m Do
+        count = count + 1
+    End
+
+    index = 0
+    While y * index <= m Do
+        count = count + 1
+    End
+    Say count
+End
+
+If Length args < 3 Or Length args > 3 // Length: initialize array to null values, find first null value
+    Say "This program requires 3 command line arguments."
+calcMultiples args[0], args[1], args[2]
+
+

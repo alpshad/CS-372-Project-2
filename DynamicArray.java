@@ -33,10 +33,12 @@ public class DynamicArray<T> {
     }
 
     public T get(int index) {
-        
+        return this.array[index];
     }
 
     public int indexOf(T item) {
-        
+        for (int i = 0; i < this.length; i++) {
+            if (this.array[i].equals(item))
+        }
     }
 }

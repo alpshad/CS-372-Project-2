@@ -28,9 +28,9 @@ public class DynamicArray<T> {
         }
     }
 
-    public T remove(int index) {
+    /* public T remove(int index) {
         // AMY DOES BECAUSE SHE'S LAZY
-    }
+    } */
 
     public T get(int index) {
         return this.array[index];
@@ -38,7 +38,14 @@ public class DynamicArray<T> {
 
     public int indexOf(T item) {
         for (int i = 0; i < this.length; i++) {
-            if (this.array[i].equals(item))
+            if (this.array[i].equals(item)) {
+
+            }
         }
+        return -1;
+    }
+
+    public int size() {
+        return this.length;
     }
 }

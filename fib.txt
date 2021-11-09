@@ -1,7 +1,7 @@
 // Program that prints out the first n fibonacci numbers
 
 Func fibonacci n
-    if n == 0 Or n == 1 Then
+    If n == 0 Or n == 1 Then
         Return n
     Else
         Return fibonacci n - 1 + fibonacci n - 2

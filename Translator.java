@@ -33,6 +33,7 @@ public class Translator {
             // When find end of loop: set current to initial index
             // Do regex
             // If line is start of block (func, cond, loop) then execute all statements in block
+            String instruction = lines.get(current);
             Pattern assignment = Pattern.compile("(\\b[a-z]+[^\\S]*\\b) ?= ?(\\w+)");
             Pattern say = Pattern.compile("(?:Say|SaySame) (.*)");
             Pattern funcDecl = Pattern.compile("Func ([a-z]+) (([a-z]+[^,]*,?)*)"); // Then split on commas
@@ -43,16 +44,90 @@ public class Translator {
             Pattern whileFirst = Pattern.compile("While (.*) Do");
             Pattern forFirst = Pattern.compile("For (\\b[a-z]+[^\\S]*\\b) ?= ?(\\w+) To ([\\w]+) Do");
             Pattern returnStat = Pattern.compile("Return (.*)");
-            String s1 = "z x = 5";
-            Matcher assgMatch = assignment.matcher(s1);
+
+            Matcher assgMatch = assignment.matcher(instruction);
+            Matcher sayMatch = say.matcher(instruction);
+            Matcher funcDeclMatch = funcDecl.matcher(instruction);
+            Matcher funcUseMatch = funcUse.matcher(instruction);
+            Matcher condFirstMatch = condFirst.matcher(instruction);
+            Matcher condElseMatch = condElse.matcher(instruction);
+            Matcher endMatch = end.matcher(instruction);
+            Matcher whileFirstMatch = whileFirst.matcher(instruction);
+            Matcher forFirstMatch = forFirst.matcher(instruction);
+            Matcher returnStatMatch = returnStat.matcher(instruction);
+            
             if (assgMatch.find()) {
-                if (!assgMatch.group(0).equals(s1)) {
+                // Assignment statement
+                if (!assgMatch.group(0).equals(instruction)) {
                     // Syntax Error
                     //exit();
                 }
 
                 System.out.println(assgMatch.group(0));
                 System.out.println(assgMatch.group(1));
+            }
+
+            if (sayMatch.find()) {
+                // Print statement
+                if (!sayMatch.group(0).equals(instruction)) {
+                    // Syntax error
+                }
+            }
+
+            if (funcDeclMatch.find()) {
+                // Function Declaration
+                if (!funcDeclMatch.group(0).equals(instruction)) {
+                    // Syntax error
+                }
+            }
+
+            if (funcUseMatch.find()) {
+                // Function use
+                if (!funcUseMatch.group(0).equals(instruction)) {
+                    // Syntax error
+                }
+            }
+
+            if (condFirstMatch.find()) {
+                // Conditional If Then
+                if (!condFirstMatch.group(0).equals(instruction)) {
+                    // Syntax error
+                }
+            }
+
+            if (condElseMatch.find()) {
+                // Conditional Else
+                if (!condElseMatch.group(0).equals(instruction)) {
+                    // Syntax error
+                }
+            }
+
+            if (endMatch.find()) {
+                // End of block
+                if (!endMatch.group(0).equals(instruction)) {
+                    // Syntax error
+                }
+            }
+
+            if (whileFirstMatch.find()) {
+                // While loop header
+                if (!whileFirstMatch.group(0).equals(instruction)) {
+                    // Syntax error
+                }
+            }
+
+            if (forFirstMatch.find()) {
+                // For loop header
+                if (!forFirstMatch.group(0).equals(instruction)) {
+                    // Syntax error
+                }
+            }
+
+            if (returnStatMatch.find()) {
+                // Return statement
+                if (!returnStatMatch.group(0).equals(instruction)) {
+                    // Syntax error
+                }
             }
             current++;
         }

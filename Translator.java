@@ -1,6 +1,7 @@
 import java.io.*;
 import java.util.Scanner;
 import java.util.Stack;
+import java.util.function.Function;
 import java.util.HashMap;
 import java.util.List;
 import java.util.ArrayList;
@@ -9,14 +10,14 @@ import java.util.regex.Pattern;
 
 public class Translator {
     public static HashMap<String, Wrapper> varList;
-    public static HashMap<String, DynamicArray<String>> funcList;
+    public static HashMap<String, Func> funcList;
+    public static List<String> lines;
     public static void main(String[] args) {
-        varList = new HashMap<String, Wrapper>();
-        funcList = new HashMap<String, DynamicArray<String>>();
+        funcList = new HashMap<String, Func>();
         try {
             File program = new File(args[0]);
             Scanner scan = new Scanner(program);
-            List<String> lines = new ArrayList<String>();
+            lines = new ArrayList<String>();
 
             while (scan.hasNextLine()) lines.add(scan.nextLine());
             scan.close();
@@ -50,6 +51,7 @@ public class Translator {
                 loop = true;
             } else if (type == 2) {
                 // Func Decl
+                List<String> interior = new ArrayList<String>();
                 blockFlag = true;
             } else if (type == 3 && loop) {
                 // End of Loop -- CHECK ON CONDITIONS
@@ -59,25 +61,43 @@ public class Translator {
                 blockFlag = !blockStart.isEmpty();
             }
             /*
-            stack<queue<int>> = [2, 4, 2]
+            globalVarList<String, Wrapper>;
+            scopedVarList<String, Wrapper>;
+            funcList<String, DynamicArray<String>>;
+            globalVarList: [
+                
+            ]
+            scopedVarList:[
+                "x": 1,
+                "y": 3
+            ]
+            funcList: [
+                "add": [{"x": , "y", }, startLine {1}, endLine {2}]
+            ]
 
-            Func add x,y
-                Return x+y
-            End
+            Lines to execute:
 
-            1 Say "HI"
-            2 For i = 1 to 10 Do loopstart = 2
-            3    Say "Hi"
-            4    x = add 1, 3
-            5    Say "x is", x
-            6 End
-            7 ... <--
+            0  Func add x,y readfile
+            1     Return x+y  funchandler
+            2  End funchandler - kicks out to readfile
+            3
+            4  Say "HI" readfile
+            5  z = 3    readfile
+            6  For i = 1 to 10 Do loopstart = 2  readfile
+            7     Say "Hi"   forhandler
+            8     x = add 1, 3    forhandler
+            9     Say "x is", x   forhandler
+            10    For j = 1 to 10 Do    forhandler
+            11        ....        forhandler_v2
+            12    End
+            10 End
+            11 
             */
             pc++;
         }
     }
 
-    public static int parseString(String instruction, int pc, boolean blockFlag) {
+    public static int parseString(String instruction, int pc, boolean funcFlag) {
         Pattern assignment = Pattern.compile("(\\b[a-z]+[^\\S]*\\b) ?= ?(.+)");
         Pattern say = Pattern.compile("((?:Say|SaySame)) (.*)");
         Pattern funcDecl = Pattern.compile("Func ([a-z]+) (([a-z]+[^,]*,?)*)"); // Then split on commas
@@ -180,6 +200,8 @@ public class Translator {
             }
 
             handleReturnStat(returnStatMatch.group(1));
+        } else if (instruction.startsWith("//")) {
+            return 0;
         } else {
             System.err.println("Syntax error in line (Invalid expression): \n" + instruction);
             System.exit(1);
@@ -221,11 +243,28 @@ public class Translator {
         return 0;
     }
 
-    public static int handleFuncDecl(String name, String parameters) {
-        return 0;
+    public static int handleFuncDecl(String name, String parameters, int pc) {
+        // parameters: x, y, z, a, b, c
+        HashMap<String, Wrapper> varList = new HashMap<String, Wrapper>();
+        DynamicArray<String> localLines = new DynamicArray<String>();
+        for (int i = pc + 1; !lines.get(i).equals("End"); i++) {
+            localLines.insert(lines.get(i));
+        }
+        
+        String[] indivParams = parameters.split(", ");
+        for (String param : indivParams) {
+            varList.put(param, new Wrapper());
+        }
+
+        Func f = new Func(name, localLines, varList);
+        funcList.put(name, f);
+
+        return pc + localLines.length;
     }
 
     public static int handleFuncUse(String name, String parameters) {
+        // HashMap() 
+        // for (variable in array) hashmap.put(variable)
         return 0;
     }
 

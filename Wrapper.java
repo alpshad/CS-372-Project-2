@@ -9,6 +9,10 @@ public class Wrapper {
         //if Translator.isNumeric(value)
     }
 
+    public Wrapper() {
+        
+    }
+
     @Override
     public boolean equals(Object o) {
         if (o == this) {

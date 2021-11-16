@@ -1,5 +1,7 @@
+import java.util.Iterator;
+
 @SuppressWarnings("unchecked")
-public class DynamicArray<T> {
+public class DynamicArray<T> implements Iterable<T> {
     public T[] array;
     private int capacity;
     public int length;
@@ -47,5 +49,24 @@ public class DynamicArray<T> {
 
     public int size() {
         return this.length;
+    }
+
+    @Override
+    public Iterator<T> iterator() {
+        Iterator<T> it = new Iterator<T>() {
+
+            private int currentIndex = 0;
+
+            @Override
+            public boolean hasNext() {
+                return currentIndex < size() && array[currentIndex] != null;
+            }
+
+            @Override
+            public T next() {
+                return array[currentIndex++];
+            }
+        };
+        return it;
     }
 }

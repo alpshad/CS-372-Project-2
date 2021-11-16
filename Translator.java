@@ -42,24 +42,25 @@ public class Translator {
             // Do regex
             // If line is start of block (func, cond, loop) then execute all statements in block
             String instruction = lines.get(pc);
-            int type = parseString(instruction, pc, blockFlag); // regular, loop, funcdecl, blockend
-            if (type == 1) {
-                // Loop
-                loopStart.push(pc);
-                blockStart.push(pc);
-                blockFlag = true;
-                loop = true;
-            } else if (type == 2) {
-                // Func Decl
-                List<String> interior = new ArrayList<String>();
-                blockFlag = true;
-            } else if (type == 3 && loop) {
-                // End of Loop -- CHECK ON CONDITIONS
-                pc = loopStart.pop();
-                loop = !loopStart.isEmpty();
-                blockStart.pop();
-                blockFlag = !blockStart.isEmpty();
-            }
+            pc = parseString(instruction, pc, blockFlag); // regular, loop, funcdecl, blockend
+            // if (type == 1) {
+            //     // Loop
+            //     loopStart.push(pc);
+            //     blockStart.push(pc);
+            //     blockFlag = true;
+            //     loop = true;
+            // } else if (type == 2) {
+            //     // Func Decl
+            //     List<String> interior = new ArrayList<String>();
+            //     blockFlag = true;
+            // } else if (type == 3 && loop) {
+            //     // End of Loop -- CHECK ON CONDITIONS
+            //     pc = loopStart.pop();
+            //     loop = !loopStart.isEmpty();
+            //     blockStart.pop();
+            //     blockFlag = !blockStart.isEmpty();
+            // }
+
             /*
             globalVarList<String, Wrapper>;
             scopedVarList<String, Wrapper>;
@@ -143,7 +144,7 @@ public class Translator {
                 System.exit(1);
             }
 
-            handleFuncDecl(funcDeclMatch.group(1), funcDeclMatch.group(2));
+            handleFuncDecl(funcDeclMatch.group(1), funcDeclMatch.group(2), pc);
         } else if (funcUseMatch.find()) {
             // Function use
             if (!funcUseMatch.group(0).equals(instruction)) {
@@ -232,9 +233,40 @@ public class Translator {
         return str != null && str.matches("[-+]?\\d*\\.?\\d+");
     }
 
+    public static Wrapper evaluateExpr(String expr) {
+        // expr = x + y == 5
+        // Recurse into lowest forms -- left associative
+        // Check regex in order of priority
+        // Then attempt to wrap, if not successful or variable, throw error
+        // Priority order: Func call, == / And / Or / Xor / Comparison, / / *, + / -
+        Pattern funcCall = Pattern.compile("([a-z]+) (([^,]*,?)*)");
+        Pattern secondOrder = Pattern.compile("(.*) ?((?:And|Or|Xor|==|<=|>=|<|>)) ?(.*)"); // Strip() afterward
+        Pattern thirdOrder = Pattern.compile("(.*) ?((?:\\/|\\*)) ?(.*)"); // Strip()
+        Pattern fourthOrder = Pattern.compile("(.*) ?((?:\\+|-)) ?(.*)"); // Strip()
+        Matcher funcMatch = funcCall.matcher(expr);
+        Matcher secondOrderMatch = secondOrder.matcher(expr);
+        Matcher thirdOrderMatch = thirdOrder.matcher(expr);
+        Matcher fourthOrderMatch = fourthOrder.matcher(expr);
+        if (funcMatch.find() && funcMatch.group(0).length() == expr.length()) {
+            handleFuncUse(funcMatch.group(1), funcMatch.group(2));
+        } else if (secondOrderMatch.find() && secondOrderMatch.group(0).length() == expr.length()) {
+
+        } else if (thirdOrderMatch.find() && thirdOrderMatch.group(0).length() == expr.length()) {
+
+        } else if (fourthOrderMatch.find() && fourthOrderMatch.group(0).length() == expr.length()) {
+            
+        }
+        // Do math on Wrappers
+
+    }
+
     public static int handleAssg(String left, String right) {
         // x + y => 5 + 3 = 8
         // varList.put(left, right);
+        // Evaluate right
+        // Possible things: +,-,/,*,and,or,xor,not,==,<,>,<=,>=,func call, values,[]
+        Wrapper val = evaluateExpr(right);
+        varList.put(left, val);
         return 0;
     }
 
@@ -245,18 +277,29 @@ public class Translator {
 
     public static int handleFuncDecl(String name, String parameters, int pc) {
         // parameters: x, y, z, a, b, c
-        HashMap<String, Wrapper> varList = new HashMap<String, Wrapper>();
+        HashMap<String, Wrapper> localVarList = new HashMap<String, Wrapper>();
         DynamicArray<String> localLines = new DynamicArray<String>();
-        for (int i = pc + 1; !lines.get(i).equals("End"); i++) {
-            localLines.insert(lines.get(i));
+        DynamicArray<String> paramOrder = new DynamicArray<String>();
+        Stack<Integer> blocks = new Stack<Integer>();
+        for (int i = pc + 1; !(lines.get(i).equals("End") && blocks.empty()); i++) {
+            String instr = lines.get(i);
+            localLines.insert(instr);
+            if (instr.contains("If") || instr.contains("While") || instr.contains("For")) {
+                blocks.add(1);
+            }
+
+            if (instr.contains("End")) {
+                blocks.pop();
+            }
         }
         
         String[] indivParams = parameters.split(", ");
         for (String param : indivParams) {
-            varList.put(param, new Wrapper());
+            localVarList.put(param, null);
+            paramOrder.insert(param);
         }
 
-        Func f = new Func(name, localLines, varList);
+        Func f = new Func(name, localLines, localVarList, paramOrder);
         funcList.put(name, f);
 
         return pc + localLines.length;
@@ -265,6 +308,34 @@ public class Translator {
     public static int handleFuncUse(String name, String parameters) {
         // HashMap() 
         // for (variable in array) hashmap.put(variable)
+        Func f = funcList.get(name);
+        if (f == null) {
+            System.err.println("Invalid Function " + name);
+            System.exit(1);
+        }
+
+        String[] indivParams = parameters.split(", ");
+        if (indivParams.length != f.paramOrder.size()) {
+            // Syntax error
+            System.err.println("Incorrect number of parameters for Function " + name);
+            System.err.println("You gave: " + indivParams.length);
+            System.err.println("Should be: " + f.paramOrder.size());
+            System.exit(1);
+        }
+
+        // Add params to function
+        for (int i = 0; i < indivParams.length; i++) {
+            // Pass to evaluateExpr
+            String paramName = f.paramOrder.get(i);
+            Wrapper value = evaluateExpr(indivParams[i]);
+            f.varList.put(paramName, value);
+        }
+
+        // Run Function block
+        for (String line : f.lines) {
+            parseString(line, 0, true);
+        }
+
         return 0;
     }
 

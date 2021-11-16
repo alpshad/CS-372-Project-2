@@ -31,6 +31,7 @@ public class Translator {
         }
     }
 
+    // Reads through globally-scoped lines
     public static void readFile(List<String> lines) {
         int pc = 0; // Program counter
         Stack<Integer> loopStart = new Stack<Integer>();
@@ -43,7 +44,7 @@ public class Translator {
             // Do regex
             // If line is start of block (func, cond, loop) then execute all statements in block
             String instruction = lines.get(pc);
-            pc = parseString(instruction, pc, blockFlag); // regular, loop, funcdecl, blockend
+            pc = parseString(instruction, pc, blockFlag, 0); // regular, loop, funcdecl, blockend
             // if (type == 1) {
             //     // Loop
             //     loopStart.push(pc);
@@ -99,7 +100,7 @@ public class Translator {
         }
     }
 
-    public static int parseString(String instruction, int pc, boolean funcFlag) {
+    public static int parseString(String instruction, int pc, boolean funcFlag, int scope) {
         Pattern assignment = Pattern.compile("(\\b[a-z]+[^\\S]*\\b) ?= ?(.+)");
         Pattern say = Pattern.compile("((?:Say|SaySame)) (.*)");
         Pattern funcDecl = Pattern.compile("Func ([a-z]+) (([a-z]+[^,]*,?)*)"); // Then split on commas
@@ -129,7 +130,7 @@ public class Translator {
                 System.exit(1);
             }
 
-            handleAssg(assgMatch.group(1), assgMatch.group(2));
+            handleAssg(assgMatch.group(1), assgMatch.group(2), scope);
         } else if (sayMatch.find()) {
             // Print statement
             if (!sayMatch.group(0).equals(instruction)) {
@@ -137,7 +138,7 @@ public class Translator {
                 System.exit(1);
             }
 
-            handleSay(assgMatch.group(1), assgMatch.group(2));
+            handleSay(assgMatch.group(1), assgMatch.group(2), scope);
         } else if (funcDeclMatch.find()) {
             // Function Declaration
             if (!funcDeclMatch.group(0).equals(instruction)) {
@@ -161,7 +162,11 @@ public class Translator {
                 System.exit(1);
             }
 
+<<<<<<< HEAD
             handleCondFirst(condFirstMatch.group(1), pc);
+=======
+            handleCondFirst(condFirstMatch.group(1), scope);
+>>>>>>> 1d34fbb1d0532ba042a0d53b5c33dc4e5f83ba95
         } else if (condElseMatch.find()) {
             // Conditional Else
             if (!condElseMatch.group(0).equals(instruction)) {
@@ -169,7 +174,11 @@ public class Translator {
                 System.exit(1);
             }
 
+<<<<<<< HEAD
             handleCondElse(condElseMatch.group(1), pc);
+=======
+            handleCondElse(condElseMatch.group(1), scope);
+>>>>>>> 1d34fbb1d0532ba042a0d53b5c33dc4e5f83ba95
         } else if (endMatch.find()) {
             // End of block
             if (!endMatch.group(0).equals(instruction)) {
@@ -185,7 +194,11 @@ public class Translator {
                 System.exit(1);
             }
 
+<<<<<<< HEAD
             handleWhileFirst(whileFirstMatch.group(1), pc);
+=======
+            handleWhileFirst(whileFirstMatch.group(1), scope);
+>>>>>>> 1d34fbb1d0532ba042a0d53b5c33dc4e5f83ba95
         } else if (forFirstMatch.find()) {
             // For loop header
             if (!forFirstMatch.group(0).equals(instruction)) {
@@ -193,7 +206,11 @@ public class Translator {
                 System.exit(1);
             }
 
+<<<<<<< HEAD
             handleForFirst(forFirstMatch.group(1), forFirstMatch.group(2), forFirstMatch.group(3), pc);
+=======
+            handleForFirst(forFirstMatch.group(1), forFirstMatch.group(2), forFirstMatch.group(3), scope);
+>>>>>>> 1d34fbb1d0532ba042a0d53b5c33dc4e5f83ba95
         } else if (returnStatMatch.find()) {
             // Return statement
             if (!returnStatMatch.group(0).equals(instruction)) {
@@ -201,9 +218,9 @@ public class Translator {
                 System.exit(1);
             }
 
-            handleReturnStat(returnStatMatch.group(1));
+            handleReturnStat(returnStatMatch.group(1), pc);
         } else if (instruction.startsWith("//")) {
-            return 0;
+            return pc;
         } else {
             System.err.println("Syntax error in line (Invalid expression): \n" + instruction);
             System.exit(1);
@@ -235,14 +252,15 @@ public class Translator {
         return str != null && str.matches("[-+]?\\d*\\.?\\d+");
     }
 
-    public static Wrapper evaluateExpr(String expr) {
+    public static Wrapper evaluateExpr(String expr, int scope) {
         // expr = x + y == 5
         // Recurse into lowest forms -- left associative
         // Check regex in order of priority
         // Then attempt to wrap, if not successful or variable, throw error
         // Priority order: Func call, == / And / Or / Xor / Comparison, / / *, + / -
-        if (varList.get(expr) != null) {
-            return varList.get(expr);
+        Wrapper varVal = varList.get(expr);
+        if (varVal != null && varVal.getScope() <= scope) {
+            return varVal;
         }
 
         try {
@@ -262,8 +280,8 @@ public class Translator {
             if (funcMatch.find() && funcMatch.group(0).length() == expr.length()) {
                 handleFuncUse(funcMatch.group(1), funcMatch.group(2));
             } else if (secondOrderMatch.find() && secondOrderMatch.group(0).length() == expr.length()) {
-                Wrapper left = evaluateExpr(secondOrderMatch.group(1).strip());
-                Wrapper right = evaluateExpr(secondOrderMatch.group(3).strip());
+                Wrapper left = evaluateExpr(secondOrderMatch.group(1).strip(), scope);
+                Wrapper right = evaluateExpr(secondOrderMatch.group(3).strip(), scope);
 
                 String operator = secondOrderMatch.group(2).strip();
                 if (operator.equals("And")) {
@@ -345,7 +363,7 @@ public class Translator {
                 System.err.println("Error evaluating expression: " + operator);
                 System.exit(1);
             } else if (notMatch.find() && notMatch.group(0).length() == expr.length()) {
-                Wrapper value = evaluateExpr(notMatch.group(1));
+                Wrapper value = evaluateExpr(notMatch.group(1), scope);
                 // Check type -- boolean
                 if (!value.isBoolean()) {
                     // Error
@@ -355,8 +373,8 @@ public class Translator {
 
                 return new Wrapper(value.not());
             } else if (thirdOrderMatch.find() && thirdOrderMatch.group(0).length() == expr.length()) {
-                Wrapper left = evaluateExpr(thirdOrderMatch.group(1).strip());
-                Wrapper right = evaluateExpr(thirdOrderMatch.group(3).strip());
+                Wrapper left = evaluateExpr(thirdOrderMatch.group(1).strip(), scope);
+                Wrapper right = evaluateExpr(thirdOrderMatch.group(3).strip(), scope);
 
                 String operator = thirdOrderMatch.group(2).strip();
                 if (operator.equals("/")) {
@@ -379,8 +397,8 @@ public class Translator {
                     return new Wrapper(left.mult(right));
                 }
             } else if (fourthOrderMatch.find() && fourthOrderMatch.group(0).length() == expr.length()) {
-                Wrapper left = evaluateExpr(fourthOrderMatch.group(1));
-                Wrapper right = evaluateExpr(fourthOrderMatch.group(3));
+                Wrapper left = evaluateExpr(fourthOrderMatch.group(1), scope);
+                Wrapper right = evaluateExpr(fourthOrderMatch.group(3), scope);
 
                 String operator = fourthOrderMatch.group(2).strip();
                 if (operator.equals("+")) {
@@ -411,18 +429,35 @@ public class Translator {
         return null;
     }
 
-    public static int handleAssg(String left, String right) {
+    public static int handleAssg(String left, String right, int scope) {
         // x + y => 5 + 3 = 8
         // varList.put(left, right);
         // Evaluate right
         // Possible things: +,-,/,*,and,or,xor,not,==,<,>,<=,>=,func call, values,[]
-        Wrapper val = evaluateExpr(right);
+        Wrapper val = evaluateExpr(right, scope);
         varList.put(left, val);
         return 0;
     }
 
-    public static int handleSay(String type, String operand) {
+    public static int handleSay(String type, String operand, int scope) {
         // Say/SaySame, [toPrint]
+        // Say "Amy", x
+        String[] items = operand.split("(?:, |,)");
+        String printable = "";
+        for (String item : items) {
+            Wrapper toPrint = evaluateExpr(item, scope);
+            printable += toPrint.toString() + " ";
+        }
+
+        printable = printable.strip();
+
+        if (type.equals("Say")) {
+            System.out.print(printable);
+        }
+
+        if (type.equals("SaySame")) {
+            System.out.println(printable);
+        }
 
         return 0;
     }
@@ -457,7 +492,7 @@ public class Translator {
         return pc + localLines.length;
     }
 
-    public static int handleFuncUse(String name, String parameters) {
+    public static int handleFuncUse(String name, String parameters, int scope) {
         // HashMap() 
         // for (variable in array) hashmap.put(variable)
         Func f = funcList.get(name);
@@ -479,13 +514,13 @@ public class Translator {
         for (int i = 0; i < indivParams.length; i++) {
             // Pass to evaluateExpr
             String paramName = f.paramOrder.get(i);
-            Wrapper value = evaluateExpr(indivParams[i]);
+            Wrapper value = evaluateExpr(indivParams[i], scope);
             f.varList.put(paramName, value);
         }
 
         // Run Function block
         for (String line : f.lines) {
-            parseString(line, 0, true);
+            parseString(line, 0, true, scope);
         }
 
         return 0;
@@ -509,11 +544,14 @@ public class Translator {
     }
 
     public static int handleForFirst(String varName, String start, String end, int pc) {
+        
         return 0;
     }
 
-    public static int handleReturnStat(String expr) {
-        return 0;
+    public static Wrapper handleReturnStat(String expr, int pc) {
+        // CHECK 
+        Wrapper retval = evaluateExpr(expr);
+        return retval;
     }
 
 /*    public static boolean validAssignment(String str) {

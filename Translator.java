@@ -162,7 +162,11 @@ public class Translator {
                 System.exit(1);
             }
 
+<<<<<<< HEAD
+            handleCondFirst(condFirstMatch.group(1), pc);
+=======
             handleCondFirst(condFirstMatch.group(1), scope);
+>>>>>>> 1d34fbb1d0532ba042a0d53b5c33dc4e5f83ba95
         } else if (condElseMatch.find()) {
             // Conditional Else
             if (!condElseMatch.group(0).equals(instruction)) {
@@ -170,7 +174,11 @@ public class Translator {
                 System.exit(1);
             }
 
+<<<<<<< HEAD
+            handleCondElse(condElseMatch.group(1), pc);
+=======
             handleCondElse(condElseMatch.group(1), scope);
+>>>>>>> 1d34fbb1d0532ba042a0d53b5c33dc4e5f83ba95
         } else if (endMatch.find()) {
             // End of block
             if (!endMatch.group(0).equals(instruction)) {
@@ -186,7 +194,11 @@ public class Translator {
                 System.exit(1);
             }
 
+<<<<<<< HEAD
+            handleWhileFirst(whileFirstMatch.group(1), pc);
+=======
             handleWhileFirst(whileFirstMatch.group(1), scope);
+>>>>>>> 1d34fbb1d0532ba042a0d53b5c33dc4e5f83ba95
         } else if (forFirstMatch.find()) {
             // For loop header
             if (!forFirstMatch.group(0).equals(instruction)) {
@@ -194,7 +206,11 @@ public class Translator {
                 System.exit(1);
             }
 
+<<<<<<< HEAD
+            handleForFirst(forFirstMatch.group(1), forFirstMatch.group(2), forFirstMatch.group(3), pc);
+=======
             handleForFirst(forFirstMatch.group(1), forFirstMatch.group(2), forFirstMatch.group(3), scope);
+>>>>>>> 1d34fbb1d0532ba042a0d53b5c33dc4e5f83ba95
         } else if (returnStatMatch.find()) {
             // Return statement
             if (!returnStatMatch.group(0).equals(instruction)) {
@@ -209,6 +225,7 @@ public class Translator {
             System.err.println("Syntax error in line (Invalid expression): \n" + instruction);
             System.exit(1);
         }
+        return pc;
     }
 
     // public static void say(String[] message) {

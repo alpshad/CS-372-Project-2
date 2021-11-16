@@ -1,16 +1,26 @@
 public class Wrapper {
     private Type varType;
     private Object value;
+    private int pc;
     private DynamicArray<Wrapper> array;
+    private int scope; // 0 is global, then add 1 for each inner scope
 
     public Wrapper(Object value) {
         // Check type
         // Could come as "6", "Hello", "[1,2,3,4]"
-        //if Translator.isNumeric(value)
+        // if Translator.isNumeric(value)
+        if (value instanceof String) {
+            // Check type
+        } else {
+
+        }
+
+        this.value = value;
     }
 
-    public Wrapper() {
-
+    public Wrapper(Object value, int pc) {
+        this(value); 
+        this.pc = pc;
     }
 
     @Override
@@ -28,6 +38,10 @@ public class Wrapper {
         return (other.varType == this.varType) && (other.value.equals(this.value));
     }
 
+    public int getScope() {
+        return this.scope;
+    }
+
     public boolean isNumeric() {
         return this.varType == Type.NUMERIC;
     }
@@ -38,6 +52,14 @@ public class Wrapper {
 
     public boolean getBooleanValue() {
         return (boolean) this.value;
+    }
+
+    public int getProgramCounter() {
+        return this.pc;
+    }
+
+    public int setProgramCounter(int pc) {
+        this.pc = pc;
     }
 
     public Object and(Wrapper other) {
@@ -86,5 +108,10 @@ public class Wrapper {
 
     public Object sub(Wrapper other) {
 
+    }
+
+    @Override
+    public String toString() {
+        
     }
 }

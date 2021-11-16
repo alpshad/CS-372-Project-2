@@ -161,7 +161,7 @@ public class Translator {
                 System.exit(1);
             }
 
-            handleCondFirst(condFirstMatch.group(1));
+            handleCondFirst(condFirstMatch.group(1), pc);
         } else if (condElseMatch.find()) {
             // Conditional Else
             if (!condElseMatch.group(0).equals(instruction)) {
@@ -169,7 +169,7 @@ public class Translator {
                 System.exit(1);
             }
 
-            handleCondElse(condElseMatch.group(1));
+            handleCondElse(condElseMatch.group(1), pc);
         } else if (endMatch.find()) {
             // End of block
             if (!endMatch.group(0).equals(instruction)) {
@@ -185,7 +185,7 @@ public class Translator {
                 System.exit(1);
             }
 
-            handleWhileFirst(whileFirstMatch.group(1));
+            handleWhileFirst(whileFirstMatch.group(1), pc);
         } else if (forFirstMatch.find()) {
             // For loop header
             if (!forFirstMatch.group(0).equals(instruction)) {
@@ -193,7 +193,7 @@ public class Translator {
                 System.exit(1);
             }
 
-            handleForFirst(forFirstMatch.group(1), forFirstMatch.group(2), forFirstMatch.group(3));
+            handleForFirst(forFirstMatch.group(1), forFirstMatch.group(2), forFirstMatch.group(3), pc);
         } else if (returnStatMatch.find()) {
             // Return statement
             if (!returnStatMatch.group(0).equals(instruction)) {
@@ -208,6 +208,7 @@ public class Translator {
             System.err.println("Syntax error in line (Invalid expression): \n" + instruction);
             System.exit(1);
         }
+        return pc;
     }
 
     // public static void say(String[] message) {

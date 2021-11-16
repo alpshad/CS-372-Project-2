@@ -41,50 +41,50 @@ public class Wrapper {
     }
 
     public Object and(Wrapper other) {
-
+        return new Object();
     }
 
     public Object or(Wrapper other) {
-
+        return new Object();
     }
 
     public Object xor(Wrapper other) {
-
+        return new Object();
     }
 
     public Object less(Wrapper other) {
-
+        return new Object();
     }
 
     public Object greater(Wrapper other) {
-
+        return new Object();
     }
 
     public Object leq(Wrapper other) {
-
+        return new Object();
     }
 
     public Object geq(Wrapper other) {
-
+        return new Object();
     }
 
     public Object add(Wrapper other) {
-
+        return new Object();
     }
 
     public Object not() {
-
+        return new Object();
     }
 
     public Object mult(Wrapper other) {
-
+        return new Object();
     }
 
     public Object div(Wrapper other) {
-
+        return new Object();
     }
 
     public Object sub(Wrapper other) {
-
+        return new Object();
     }
 }

@@ -154,7 +154,7 @@ public class Translator {
                 System.exit(1);
             }
 
-            handleFuncUse(funcUseMatch.group(1), funcUseMatch.group(2));
+            handleFuncUse(funcUseMatch.group(1), funcUseMatch.group(2), scope);
         } else if (condFirstMatch.find()) {
             // Conditional If Then
             if (!condFirstMatch.group(0).equals(instruction)) {

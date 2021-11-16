@@ -5,6 +5,7 @@ import java.util.function.Function;
 import java.util.HashMap;
 import java.util.List;
 import java.util.ArrayList;
+import java.util.EventListener;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -239,25 +240,174 @@ public class Translator {
         // Check regex in order of priority
         // Then attempt to wrap, if not successful or variable, throw error
         // Priority order: Func call, == / And / Or / Xor / Comparison, / / *, + / -
-        Pattern funcCall = Pattern.compile("([a-z]+) (([^,]*,?)*)");
-        Pattern secondOrder = Pattern.compile("(.*) ?((?:And|Or|Xor|==|<=|>=|<|>)) ?(.*)"); // Strip() afterward
-        Pattern thirdOrder = Pattern.compile("(.*) ?((?:\\/|\\*)) ?(.*)"); // Strip()
-        Pattern fourthOrder = Pattern.compile("(.*) ?((?:\\+|-)) ?(.*)"); // Strip()
-        Matcher funcMatch = funcCall.matcher(expr);
-        Matcher secondOrderMatch = secondOrder.matcher(expr);
-        Matcher thirdOrderMatch = thirdOrder.matcher(expr);
-        Matcher fourthOrderMatch = fourthOrder.matcher(expr);
-        if (funcMatch.find() && funcMatch.group(0).length() == expr.length()) {
-            handleFuncUse(funcMatch.group(1), funcMatch.group(2));
-        } else if (secondOrderMatch.find() && secondOrderMatch.group(0).length() == expr.length()) {
-
-        } else if (thirdOrderMatch.find() && thirdOrderMatch.group(0).length() == expr.length()) {
-
-        } else if (fourthOrderMatch.find() && fourthOrderMatch.group(0).length() == expr.length()) {
-            
+        if (varList.get(expr) != null) {
+            return varList.get(expr);
         }
-        // Do math on Wrappers
 
+        try {
+            Wrapper value = new Wrapper(expr);
+            return value;
+        } catch (Exception e) {
+            Pattern funcCall = Pattern.compile("([a-z]+) (([^,]*,?)*)");
+            Pattern secondOrder = Pattern.compile("(.*) ?((?:And|Or|Xor|==|<=|>=|<|>)) ?(.*)"); // Strip() afterward
+            Pattern not = Pattern.compile("Not (.*)");
+            Pattern thirdOrder = Pattern.compile("(.*) ?((?:\\/|\\*)) ?(.*)"); // Strip()
+            Pattern fourthOrder = Pattern.compile("(.*) ?((?:\\+|-)) ?(.*)"); // Strip()
+            Matcher funcMatch = funcCall.matcher(expr);
+            Matcher secondOrderMatch = secondOrder.matcher(expr);
+            Matcher notMatch = not.matcher(expr);
+            Matcher thirdOrderMatch = thirdOrder.matcher(expr);
+            Matcher fourthOrderMatch = fourthOrder.matcher(expr);
+            if (funcMatch.find() && funcMatch.group(0).length() == expr.length()) {
+                handleFuncUse(funcMatch.group(1), funcMatch.group(2));
+            } else if (secondOrderMatch.find() && secondOrderMatch.group(0).length() == expr.length()) {
+                Wrapper left = evaluateExpr(secondOrderMatch.group(1).strip());
+                Wrapper right = evaluateExpr(secondOrderMatch.group(3).strip());
+
+                String operator = secondOrderMatch.group(2).strip();
+                if (operator.equals("And")) {
+                    // Variables must be booleans
+                    if (!(left.isBoolean() && right.isBoolean())) {
+                        // Error
+                        System.err.println("Type Error: And must be used on boolean types");
+                        System.exit(1);
+                    }
+
+                    return new Wrapper(left.and(right));
+                }
+
+                if (operator.equals("Or")) {
+                    if (!(left.isBoolean() && right.isBoolean())) {
+                        // Error
+                        System.err.println("Type Error: Or must be used on boolean types");
+                        System.exit(1);
+                    }
+
+                    return new Wrapper(left.or(right));
+                }
+
+                if (operator.equals("Xor")) {
+                    if (!(left.isBoolean() && right.isBoolean())) {
+                        // Error
+                        System.err.println("Type Error: Xor must be used on boolean types");
+                        System.exit(1);
+                    }
+
+                    return new Wrapper(left.xor(right));
+                }
+
+                if (operator.equals("==")) {
+                    // Check types: numeric or string
+                    return new Wrapper(left.equals(right));
+                }
+
+                if (operator.equals("<=")) {
+                    if (!(left.isNumeric() && right.isNumeric())) {
+                        // Error
+                        System.err.println("Type Error: <= must be used on numeric types");
+                        System.exit(1);
+                    }
+
+                    return new Wrapper(left.leq(right));
+                }
+
+                if (operator.equals(">=")) {
+                    if (!(left.isNumeric() && right.isNumeric())) {
+                        // Error
+                        System.err.println("Type Error: >= must be used on numeric types");
+                        System.exit(1);
+                    }
+
+                    return new Wrapper(left.geq(right));
+                }
+
+                if (operator.equals("<")) {
+                    if (!(left.isNumeric() && right.isNumeric())) {
+                        // Error
+                        System.err.println("Type Error: < must be used on numeric types");
+                        System.exit(1);
+                    }
+
+                    return new Wrapper(left.less(right));
+                }
+
+                if (operator.equals(">")) {
+                    if (!(left.isNumeric() && right.isNumeric())) {
+                        // Error
+                        System.err.println("Type Error: > must be used on numeric types");
+                        System.exit(1);
+                    }
+
+                    return new Wrapper(left.greater(right));
+                }
+
+                System.err.println("Error evaluating expression: " + operator);
+                System.exit(1);
+            } else if (notMatch.find() && notMatch.group(0).length() == expr.length()) {
+                Wrapper value = evaluateExpr(notMatch.group(1));
+                // Check type -- boolean
+                if (!value.isBoolean()) {
+                    // Error
+                    System.err.println("Type Error: Not must be used on boolean types");
+                    System.exit(1);
+                }
+
+                return new Wrapper(value.not());
+            } else if (thirdOrderMatch.find() && thirdOrderMatch.group(0).length() == expr.length()) {
+                Wrapper left = evaluateExpr(thirdOrderMatch.group(1).strip());
+                Wrapper right = evaluateExpr(thirdOrderMatch.group(3).strip());
+
+                String operator = thirdOrderMatch.group(2).strip();
+                if (operator.equals("/")) {
+                    if (!(left.isNumeric() && right.isNumeric())) {
+                        // Error
+                        System.err.println("Type Error: / must be used on numeric types");
+                        System.exit(1);
+                    }
+
+                    return new Wrapper(left.div(right));
+                }
+
+                if (operator.equals("*")) {
+                    if (!(left.isNumeric() && right.isNumeric())) {
+                        // Error
+                        System.err.println("Type Error: * must be used on numeric types");
+                        System.exit(1);
+                    }
+
+                    return new Wrapper(left.mult(right));
+                }
+            } else if (fourthOrderMatch.find() && fourthOrderMatch.group(0).length() == expr.length()) {
+                Wrapper left = evaluateExpr(fourthOrderMatch.group(1));
+                Wrapper right = evaluateExpr(fourthOrderMatch.group(3));
+
+                String operator = fourthOrderMatch.group(2).strip();
+                if (operator.equals("+")) {
+                    if (!(left.isNumeric() && right.isNumeric())) {
+                        // Error
+                        System.err.println("Type Error: + must be used on numeric types");
+                        System.exit(1);
+                    }
+
+                    return new Wrapper(left.add(right));
+                }
+
+                if (operator.equals("-")) {
+                    if (!(left.isNumeric() && right.isNumeric())) {
+                        // Error
+                        System.err.println("Type Error: - must be used on numeric types");
+                        System.exit(1);
+                    }
+
+                    return new Wrapper(left.sub(right));
+                }
+            } else {
+                System.err.println("Parsing Error: Invalid Expression: " + expr);
+                System.exit(1);
+            }
+        }
+
+        return null;
     }
 
     public static int handleAssg(String left, String right) {
@@ -272,6 +422,7 @@ public class Translator {
 
     public static int handleSay(String type, String operand) {
         // Say/SaySame, [toPrint]
+
         return 0;
     }
 
@@ -339,23 +490,24 @@ public class Translator {
         return 0;
     }
 
-    public static int handleCondFirst(String condition) {
+    public static int handleCondFirst(String condition, int pc) {
         return 0;
     }
     
-    public static int handleCondElse(String condition) {
+    public static int handleCondElse(String condition, int pc) {
         return 0;
     }
 
     public static int handleEnd() {
+        // Throw error?
         return 0;
     }
 
-    public static int handleWhileFirst(String condition) {
+    public static int handleWhileFirst(String condition, int pc) {
         return 0;
     }
 
-    public static int handleForFirst(String varName, String start, String end) {
+    public static int handleForFirst(String varName, String start, String end, int pc) {
         return 0;
     }
 

@@ -1,0 +1,28 @@
+SaySame "Hello World"
+x = 5
+y = 4
+z = True
+a = False
+k = True
+SaySame x
+SaySame y
+SaySame x % y
+SaySame x / y
+//SaySame z
+//SaySame x + y
+//SaySame x - y
+//SaySame x * y
+//SaySame x * y
+//SaySame x > y
+//SaySame x < y
+//SaySame x == y
+//SaySame x <= y
+//SaySame x >= y
+//SaySame z And a
+//SaySame z And k
+//SaySame z Or a
+//SaySame z Or k
+//SaySame Not z
+//SaySame Not a
+//SaySame z Xor a
+//SaySame z Xor k

@@ -25,6 +25,13 @@ public class Translator {
 
             //for(String line : lines) System.out.println(line);
 
+            // Add command line args to the list of variables
+            for (int i = 1; i < args.length; i++) {
+                varList.put("a" + i, new Wrapper(args[i]));
+            }
+
+            varList.put("a#", new Wrapper(args.length - 1)); // Total number of command line args
+
             readFile(lines);
         } catch (FileNotFoundException e) {
             System.err.println("File not found");

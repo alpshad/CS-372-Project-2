@@ -1,6 +1,7 @@
 Func add x,y
     Return x + y
 End
+End
 
 z = add 3,5
 Say z

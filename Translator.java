@@ -585,6 +585,7 @@ public class Translator {
     }
 
     public static int handleCondFirst(String condition, int scope, HashMap<String, Wrapper> funcVarList) {
+
         return 0;
     }
     
@@ -594,7 +595,9 @@ public class Translator {
 
     public static int handleEnd() {
         // Throw error?
-        return 0;
+        System.out.println("Parsing Error in line " + (pc + 1) + ": Unbounded End");
+        System.exit(1);
+        return -1;
     }
 
     public static int handleWhileFirst(String condition, int scope, HashMap<String, Wrapper> funcVarList) {

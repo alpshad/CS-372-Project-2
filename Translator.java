@@ -473,11 +473,11 @@ public class Translator {
         printable = printable.strip();
 
         if (type.equals("Say")) {
-            System.out.print(printable);
+            System.out.println(printable);
         }
 
         if (type.equals("SaySame")) {
-            System.out.println(printable);
+            System.out.print(printable);
         }
 
         return 0;

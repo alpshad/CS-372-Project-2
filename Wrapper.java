@@ -5,6 +5,8 @@ public class Wrapper {
     private DynamicArray<Wrapper> array;
     private int scope; // 0 is global, then add 1 for each inner scope
 
+    public Wrapper() { }
+
     public Wrapper(Object value) {
         // Check type
         // Could come as "6", 6, ""Hello"", "[1,2,3,4]"

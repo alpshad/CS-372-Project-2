@@ -2,4 +2,4 @@ Func add x,y
     Return x + y
 End
 
-SaySame add 1, 2
+SaySame "Hello", add 1, add 1, 2

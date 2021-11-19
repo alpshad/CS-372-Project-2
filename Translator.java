@@ -58,6 +58,7 @@ public class Translator {
 
             Wrapper pcWrap = parseString(instruction, 0, pc, null);
             pc = pcWrap.getProgramCounter();
+            //System.out.println("PC: " + (pc+1));
             /*
             globalVarList<String, Wrapper>;
             scopedVarList<String, Wrapper>;
@@ -97,15 +98,15 @@ public class Translator {
 
     public static Wrapper parseString(String instruction, int scope, int tempPC, HashMap<String, Wrapper> funcVarList) {
         instruction = instruction.strip();
-        Pattern assignment = Pattern.compile("(\\b[a-z]+[^\\S]*\\b) ?= ?(.+)");
+        Pattern assignment = Pattern.compile("(\\b[a-z]+[A-Za-z0-9]*\\b) ?= ?(.+)");
         Pattern say = Pattern.compile("((?:Say|SaySame)) (.*)");
-        Pattern funcDecl = Pattern.compile("Func ([a-z]+) (([a-z]+[^,]*,?)*)"); // Then split on commas
-        Pattern funcUse = Pattern.compile("([a-z]+) (([^,]*,?)*)");
+        Pattern funcDecl = Pattern.compile("Func (\\b[a-z]+[A-Za-z0-9]*\\b) ?(([a-z]+[^,]*,?)*)"); // Then split on commas
+        Pattern funcUse = Pattern.compile("(\\b[a-z]+[A-Za-z0-9]*\\b) ?(([^,]*,?)*)");
         Pattern condFirst = Pattern.compile("If (.*) Then");
         Pattern condElse = Pattern.compile("Else ?(.*)");
         Pattern end = Pattern.compile("End");
         Pattern whileFirst = Pattern.compile("While (.*) Do");
-        Pattern forFirst = Pattern.compile("For (\\b[a-z]+[^\\S]*\\b) ?= ?(.+) To (.+) Do");
+        Pattern forFirst = Pattern.compile("For (\\b[a-z]+[A-Za-z0-9]*\\b) ?= ?(.+) To (.+) Do");
         Pattern returnStat = Pattern.compile("Return (.*)");
 
         Matcher assgMatch = assignment.matcher(instruction);
@@ -129,14 +130,6 @@ public class Translator {
             }
 
             handleSay(sayMatch.group(1), sayMatch.group(2), scope, funcVarList);
-        } else if (assgMatch.find()) {
-            // Assignment statement
-            if (!assgMatch.group(0).equals(instruction)) {
-                System.err.println("Syntax error executing line " + (tempPC + 1) + " (Invalid assignment): " + instruction);
-                System.exit(1);
-            }
-
-            handleAssg(assgMatch.group(1), assgMatch.group(2), scope, funcVarList);
         } else if (returnStatMatch.find()) {
             // Return statement
             if (!returnStatMatch.group(0).equals(instruction)) {
@@ -152,15 +145,20 @@ public class Translator {
                 System.exit(1);
             }
 
+            if (funcDeclMatch.group(2) != null) {
+                return new Wrapper(0, handleFuncDecl(funcDeclMatch.group(1), "", scope));
+            }
+
             return new Wrapper(0, handleFuncDecl(funcDeclMatch.group(1), funcDeclMatch.group(2), scope));
-        } else if (funcUseMatch.find()) {
-            // Function use
-            if (!funcUseMatch.group(0).equals(instruction)) {
-                System.err.println("Syntax error executing line " + (tempPC + 1) + " (Invalid function usage): " + instruction);
+        } else if (condElseMatch.find()) {
+            //System.out.println("cond else");
+            // Conditional Else
+            if (!condElseMatch.group(0).equals(instruction)) {
+                System.err.println("Syntax error executing line " + (tempPC + 1) +  " (Invalid Else conditional): " + instruction);
                 System.exit(1);
             }
 
-            return handleFuncUse(funcUseMatch.group(1), funcUseMatch.group(2), scope, funcVarList);
+            return handleCondElse(condElseMatch.group(1), scope, tempPC, funcVarList);
         } else if (condFirstMatch.find()) {
             // Conditional If Then
             if (!condFirstMatch.group(0).equals(instruction)) {
@@ -168,15 +166,7 @@ public class Translator {
                 System.exit(1);
             }
 
-            return new Wrapper(0, handleCondFirst(condFirstMatch.group(1), scope, funcVarList));
-        } else if (condElseMatch.find()) {
-            // Conditional Else
-            if (!condElseMatch.group(0).equals(instruction)) {
-                System.err.println("Syntax error executing line " + (tempPC + 1) +  " (Invalid Else conditional): " + instruction);
-                System.exit(1);
-            }
-
-            return new Wrapper(0, handleCondElse(condElseMatch.group(1), scope, funcVarList));
+            return handleCondFirst(condFirstMatch.group(1), scope, tempPC, funcVarList);
         } else if (endMatch.find()) {
             // End of block
             if (!endMatch.group(0).equals(instruction)) {
@@ -201,12 +191,28 @@ public class Translator {
             }
 
             handleForFirst(forFirstMatch.group(1), forFirstMatch.group(2), forFirstMatch.group(3), scope, funcVarList);
+        } else if (assgMatch.find()) {
+            // Assignment statement
+            if (!assgMatch.group(0).equals(instruction)) {
+                System.err.println("Syntax error executing line " + (tempPC + 1) + " (Invalid assignment): " + instruction);
+                System.exit(1);
+            }
+
+            handleAssg(assgMatch.group(1), assgMatch.group(2), scope, funcVarList);
+        } else if (funcUseMatch.find()) {
+            // Function use
+            if (!funcUseMatch.group(0).equals(instruction)) {
+                System.err.println("Syntax error executing line " + (tempPC + 1) + " (Invalid function usage): " + instruction);
+                System.exit(1);
+            }
+
+            return handleFuncUse(funcUseMatch.group(1), funcUseMatch.group(2), scope, funcVarList);
         } else {
             System.err.println("Syntax error executing line " + (tempPC + 1) + " (Invalid expression): \n" + instruction);
             System.exit(1);
         }
 
-        return new Wrapper(0, pc);
+        return new Wrapper(0, tempPC);
     }
 
     // public static void say(String[] message) {
@@ -235,7 +241,7 @@ public class Translator {
 
     public static Wrapper evaluateExpr(String expr, int scope, int tempPC, HashMap<String, Wrapper> funcVarList) {
         expr = expr.strip();
-        System.out.println(expr);
+        //System.out.println(expr);
         //System.out.println("Evaluating " + expr);
         // expr = x + y == 5
         // x + y + 5
@@ -244,7 +250,6 @@ public class Translator {
         // Then attempt to wrap, if not successful or variable, throw error
         // Priority order: Func call, == / And / Or / Xor / Comparison, / / *, + / -
         if (funcVarList != null && funcVarList.get(expr) != null) {
-            System.out.println("Function var");
             return funcVarList.get(expr);
         }
         
@@ -425,7 +430,7 @@ public class Translator {
             } else if (funcMatch.find() && funcMatch.group(0).length() == expr.length()) {
                 return handleFuncUse(funcMatch.group(1), funcMatch.group(2), scope, funcVarList);
             } else {
-                System.err.println("Parsing Error executing line " + (tempPC + 1) + ": Invalid Expression " + expr);
+                System.err.println("Syntax Error executing line " + (tempPC + 1) + " (Invalid expression): " + expr);
                 System.exit(1);
             }
         }
@@ -445,11 +450,11 @@ public class Translator {
 
     public static int handleSay(String type, String operand, int scope, HashMap<String, Wrapper> funcVarList) {
         // Say/SaySame, [toPrint]
-        // Say "Amy", add 1, 2
-        Pattern funcCall = Pattern.compile("([a-z]+) (([^,]*,?)*)");
+        // Say "Amy Paul", add 1, 2
+        Pattern funcCall = Pattern.compile("(\\b[a-z]+[A-Za-z0-9]*\\b) ?(([^,]*,?)*)");
         Matcher funcMatch = funcCall.matcher(operand);
         String[] items;
-        if (funcMatch.find()) {
+        if (funcMatch.find() && funcList.get(funcMatch.group(1)) != null) {
             //System.out.println(funcMatch.group(0));
             String[] nonFunc = operand.split(funcMatch.group(0));
             String[] temp = nonFunc[0].split("(?:, |,)");
@@ -465,7 +470,6 @@ public class Translator {
 
         String printable = "";
         for (String item : items) {
-            //System.out.println(item);
             Wrapper toPrint = evaluateExpr(item, scope, pc, null);
             printable += toPrint.toString() + " ";
         }
@@ -490,7 +494,7 @@ public class Translator {
         DynamicArray<Integer> lineNumbers = new DynamicArray<Integer>();
         DynamicArray<String> paramOrder = new DynamicArray<String>();
         Stack<Integer> blocks = new Stack<Integer>();
-        for (int i = pc + 1; !(lines.get(i).equals("End") && blocks.empty()); i++) {
+        for (int i = pc + 1; !(lines.get(i).contains("End") && blocks.empty()); i++) {
             String instr = lines.get(i).strip();
             if (instr.equals("")) {
                 pc++;
@@ -499,7 +503,7 @@ public class Translator {
 
             lineNumbers.insert(i);
             localLines.insert(instr);
-            if (instr.contains("If") || instr.contains("While") || instr.contains("For")) {
+            if ((instr.contains("If") && !instr.contains("Else")) || instr.contains("While") || instr.contains("For")) {
                 blocks.add(1);
             }
 
@@ -530,41 +534,43 @@ public class Translator {
             System.exit(1);
         }
 
-        Pattern funcCall = Pattern.compile("([a-z]+) (([^,]*,?)*)");
-        Matcher funcMatch = funcCall.matcher(parameters);
-        String[] indivParams;
-        if (funcMatch.find()) {
-            //System.out.println(funcMatch.group(0));
-            String[] nonFunc = parameters.split(funcMatch.group(0));
-            String[] temp = nonFunc[0].split("(?:, |,)");
-            indivParams = new String[temp.length + 1];
-            for (int i = 0; i < temp.length; i++) {
-                //System.out.println(temp[i]);
-                indivParams[i] = temp[i];
+        if (!parameters.equals("")) {
+            Pattern funcCall = Pattern.compile("(\\b[a-z]+[A-Za-z0-9]*\\b) ?(([^,]*,?)*)");
+            Matcher funcMatch = funcCall.matcher(parameters);
+            String[] indivParams;
+            if (funcMatch.find()) {
+                //System.out.println(funcMatch.group(0));
+                String[] nonFunc = parameters.split(funcMatch.group(0));
+                String[] temp = nonFunc[0].split("(?:, |,)");
+                indivParams = new String[temp.length + 1];
+                for (int i = 0; i < temp.length; i++) {
+                    //System.out.println(temp[i]);
+                    indivParams[i] = temp[i];
+                }
+
+                indivParams[indivParams.length - 1] = funcMatch.group(0);
+            } else {
+                indivParams = parameters.split("(?:, |,)");
             }
 
-            indivParams[indivParams.length - 1] = funcMatch.group(0);
-        } else {
-            indivParams = parameters.split("(?:, |,)");
-        }
+            if (indivParams.length != f.paramOrder.size()) {
+                // Syntax error
+                System.err.println("Incorrect number of parameters for Function " + name);
+                System.err.println("You gave: " + indivParams.length);
+                System.err.println("Should be: " + f.paramOrder.size());
+                System.exit(1);
+            }
 
-        if (indivParams.length != f.paramOrder.size()) {
-            // Syntax error
-            System.err.println("Incorrect number of parameters for Function " + name);
-            System.err.println("You gave: " + indivParams.length);
-            System.err.println("Should be: " + f.paramOrder.size());
-            System.exit(1);
-        }
-
-        //System.out.println("Executing function");
-        // Add params to function
-        for (int i = 0; i < indivParams.length; i++) {
-            //System.out.println("param " + indivParams[i]);
-            // Pass to evaluateExpr
-            String paramName = f.paramOrder.get(i);
-            Wrapper value = evaluateExpr(indivParams[i].strip(), scope, pc, f.varList);
-            System.out.println(value);
-            f.varList.put(paramName, value);
+            //System.out.println("Executing function");
+            // Add params to function
+            for (int i = 0; i < indivParams.length; i++) {
+                //System.out.println("param " + indivParams[i]);
+                // Pass to evaluateExpr
+                String paramName = f.paramOrder.get(i);
+                Wrapper value = evaluateExpr(indivParams[i].strip(), scope, pc, f.varList);
+                //System.out.println(value);
+                f.varList.put(paramName, value);
+            }
         }
 
         HashMap<String, Wrapper> newFuncList = new HashMap<String, Wrapper>();
@@ -577,20 +583,100 @@ public class Translator {
         Wrapper retval = new Wrapper();
         // Run Function block
         for (int i = 0; i < f.lines.size(); i++) {
+            System.out.println(f.lines.get(i));
             retval = parseString(f.lines.get(i), scope, f.lineNumbers.get(i), newFuncList);
-            System.out.println("Return " + retval);
+            System.out.println(i);
+            if (retval.getProgramCounter() != 0) {
+                i = retval.getProgramCounter() - i;
+            }
+            System.out.println(i);
+            //System.out.println("Return " + retval);
         }
 
         return retval;
     }
 
-    public static int handleCondFirst(String condition, int scope, HashMap<String, Wrapper> funcVarList) {
+    public static Wrapper handleCondFirst(String condition, int scope, int blockPc, HashMap<String, Wrapper> funcVarList) {
+        System.out.println(blockPc + 1);
+        //System.out.println(condition);
+        // If x == 5 Then
+        //   z = 10
+        //   Say z
+        // Else If x == 2 Then
+        //   Say "Hi"
+        // Else If x == 3 Then
+        //   z = 4
+        // End
+        Wrapper cond = evaluateExpr(condition, scope, pc, funcVarList);
+        //System.out.println(cond);
+        //int tempPc = pc;
+        int elseLine = 0;
+        //while (!lines.get(tempPc).startsWith("Else")) {
+        //    tempPc++;
+        //}
+        //elseLine = tempPc;
 
-        return 0;
+        Stack<Integer> blocks = new Stack<Integer>();
+        int tempPc = blockPc + 1;
+        while (!((lines.get(tempPc).contains("Else") || lines.get(tempPc).contains("End")) && blocks.empty())) {
+            String instr = lines.get(tempPc).strip();
+            if (instr.equals("")) {
+                tempPc++;
+                continue;
+            }
+
+            if ((instr.contains("If") && !instr.contains("Else")) || instr.contains("While") || instr.contains("For")) {
+                System.out.println("Pushing");
+                blocks.add(1);
+            }
+
+            if (instr.contains("End")) {
+                System.out.println("Popping");
+                blocks.pop();
+            }
+
+            tempPc++;
+        }
+
+        //System.out.println(pc + 1);
+        //System.out.println(tempPc + 1);
+        Wrapper retval = new Wrapper();
+        if (cond.equals(new Wrapper(true))) {   
+            for (int i = blockPc + 1; i < tempPc; i++) {
+                System.out.println(i);
+                retval = parseString(lines.get(i), scope + 1, i, funcVarList);
+            }
+        } 
+
+        if (lines.get(tempPc).contains("Else")) {
+            //System.out.println("Else");
+            blockPc = tempPc - 1;
+        } else {
+            //System.out.println(lines.get(tempPc));
+            blockPc = tempPc;
+        }
+
+        retval.setProgramCounter(blockPc);
+
+        return retval;
     }
     
-    public static int handleCondElse(String condition, int scope, HashMap<String, Wrapper> funcVarList) {
-        return 0;
+    public static Wrapper handleCondElse(String condition, int scope, int blockPc, HashMap<String, Wrapper> funcVarList) {
+        //System.out.println("In else");
+        Wrapper retval = new Wrapper();
+        if (!condition.equals("")) {
+            Pattern p = Pattern.compile("If (.*) Then");
+            Matcher matcher = p.matcher(condition);
+            if (!matcher.find() || matcher.group(0).length() != condition.length()) {
+                System.err.println("Syntax error in line " + (blockPc + 1) + " (Invalid If header): " + condition);
+                System.exit(1);
+            }
+
+            retval = handleCondFirst(matcher.group(1), scope, blockPc, funcVarList);
+            //System.out.println(retval.getProgramCounter());
+        }
+
+        return retval;
     }
 
     public static int handleEnd() {
@@ -601,6 +687,7 @@ public class Translator {
     }
 
     public static int handleWhileFirst(String condition, int scope, HashMap<String, Wrapper> funcVarList) {
+        
         return 0;
     }
 
@@ -612,7 +699,7 @@ public class Translator {
     public static Wrapper handleReturnStat(String expr, int scope, HashMap<String, Wrapper> funcVarList) {
         // CHECK 
         Wrapper retval = evaluateExpr(expr, scope, pc, funcVarList);
-        System.out.println("Return" + retval);
+        //System.out.println("Return" + retval);
         return retval;
     }
 

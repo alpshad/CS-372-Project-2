@@ -29,7 +29,6 @@ public class Wrapper {
             } else if (str != null && str.matches("(?:True|False)")) {
                 // Boolean
                 if (value.equals("True")) {
-                    //System.out.println("Storing true");
                     this.value = true;
                 } else {
                     this.value = false;
@@ -96,7 +95,6 @@ public class Wrapper {
             System.err.println("Unsupported Operation");
             System.exit(1);
         }
-        //System.out.println(this.value instanceof String);
 
         return (int) this.value;
     }

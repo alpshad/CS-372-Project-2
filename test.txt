@@ -4,7 +4,6 @@ End
 
 Func doStuff
     z = 20
-    Say z
     If z == 2 Then
         Say "Hello"
     Else If z == 5 Then

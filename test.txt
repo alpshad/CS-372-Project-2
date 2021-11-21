@@ -3,7 +3,7 @@ Func add x,y
 End
 
 Func doStuff
-    z = 20
+    z = 2
     If z == 2 Then
         Say "Hello"
     Else If z == 5 Then

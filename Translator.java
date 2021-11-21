@@ -53,6 +53,7 @@ public class Translator {
     }
 
     public static Wrapper parseString(String instruction, int scope, int tempPC, HashMap<String, Wrapper> funcVarList) {
+        System.out.println("Instruction: " + instruction);
         instruction = instruction.strip();
         Pattern assignment = Pattern.compile("(\\b[a-z]+[A-Za-z0-9]*\\b) ?= ?(.+)");
         Pattern say = Pattern.compile("((?:Say|SaySame)) (.*)");
@@ -85,7 +86,7 @@ public class Translator {
                 System.exit(1);
             }
 
-            handleSay(sayMatch.group(1), sayMatch.group(2), scope, funcVarList);
+            return handleSay(sayMatch.group(1), sayMatch.group(2), scope, tempPC, funcVarList);
         } else if (returnStatMatch.find()) {
             // Return statement
             if (!returnStatMatch.group(0).equals(instruction)) {
@@ -108,6 +109,7 @@ public class Translator {
             return new Wrapper(0, handleFuncDecl(funcDeclMatch.group(1), funcDeclMatch.group(2), scope));
         } else if (condElseMatch.find()) {
             // Conditional Else
+            System.out.println("Else match");
             if (!condElseMatch.group(0).equals(instruction)) {
                 System.err.println("Syntax error executing line " + (tempPC + 1) +  " (Invalid Else conditional): " + instruction);
                 System.exit(1);
@@ -115,6 +117,7 @@ public class Translator {
 
             return handleCondElse(condElseMatch.group(1), scope, tempPC, funcVarList);
         } else if (condFirstMatch.find()) {
+            System.out.println("Cond match");
             // Conditional If Then
             if (!condFirstMatch.group(0).equals(instruction)) {
                 System.err.println("Syntax error executing line " + (tempPC + 1) + " (Invalid If header): " + instruction);
@@ -129,7 +132,7 @@ public class Translator {
                 System.exit(1);
             }
 
-            handleEnd();
+            handleEnd(tempPC);
         } else if (whileFirstMatch.find()) {
             // While loop header
             if (!whileFirstMatch.group(0).equals(instruction)) {
@@ -153,7 +156,7 @@ public class Translator {
                 System.exit(1);
             }
 
-            handleAssg(assgMatch.group(1), assgMatch.group(2), scope, funcVarList);
+            return handleAssg(assgMatch.group(1), assgMatch.group(2), scope, tempPC, funcVarList);
         } else if (funcUseMatch.find()) {
             // Function use
             if (!funcUseMatch.group(0).equals(instruction)) {
@@ -363,13 +366,14 @@ public class Translator {
         return null;
     }
 
-    public static int handleAssg(String left, String right, int scope, HashMap<String, Wrapper> funcVarList) {
+    public static Wrapper handleAssg(String left, String right, int scope, int blockPc, HashMap<String, Wrapper> funcVarList) {
         Wrapper val = evaluateExpr(right, scope, pc, null);
         varList.put(left, val);
-        return 0;
+        val.setProgramCounter(blockPc);
+        return val;
     }
 
-    public static int handleSay(String type, String operand, int scope, HashMap<String, Wrapper> funcVarList) {
+    public static Wrapper handleSay(String type, String operand, int scope, int blockPc, HashMap<String, Wrapper> funcVarList) {
         // Say/SaySame, [toPrint]
         // Say "Amy Paul", add 1, 2
         Pattern funcCall = Pattern.compile("(\\b[a-z]+[A-Za-z0-9]*\\b) ?(([^,]*,?)*)");
@@ -404,7 +408,10 @@ public class Translator {
             System.out.print(printable);
         }
 
-        return 0;
+        Wrapper retval = new Wrapper();
+        retval.setProgramCounter(blockPc);
+
+        return retval;
     }
 
     public static int handleFuncDecl(String name, String parameters, int scope) {
@@ -494,15 +501,17 @@ public class Translator {
 
         Wrapper retval = new Wrapper();
         for (int i : f.lineNumbers) {
-            System.out.println(i);
+            System.out.println("Func line #: " +i);
         }
         
         // Run Function block
         for (int i = 0; i < f.lines.size(); i++) {
+            System.out.println("line: " + f.lines.get(i));
             retval = parseString(f.lines.get(i), scope, f.lineNumbers.get(i), newFuncList);
             System.out.println(i);
-            System.out.println("retval pc: " + (retval.getProgramCounter()-1));
-            i = retval.getProgramCounter()-1;
+            System.out.println("retval pc: " + (retval.getProgramCounter()+1));
+            i = retval.getProgramCounter();
+            System.out.println("What the fuck " + (i+1));
         }
 
         retval.setProgramCounter(blockPc);
@@ -510,16 +519,21 @@ public class Translator {
     }
 
     public static Wrapper handleCondFirst(String condition, int scope, int blockPc, HashMap<String, Wrapper> funcVarList) {
+        System.out.println("Cond block PC: " + (blockPc +1));
         Wrapper cond = evaluateExpr(condition, scope, pc, funcVarList);
 
-        System.out.println("Cond block PC: " + (blockPc +1));
         Stack<Integer> blocks = new Stack<Integer>();
         int tempPc = blockPc + 1;
-        while (!((lines.get(tempPc).contains("Else") || lines.get(tempPc).contains("End")) && blocks.empty())) {
+        int elseIndex = 0;
+        while (!(lines.get(tempPc).contains("End") && blocks.empty())) {
             String instr = lines.get(tempPc).strip();
             if (instr.equals("")) {
                 tempPc++;
                 continue;
+            }
+
+            if (instr.contains("Else") && blocks.empty() && elseIndex == 0) {
+                elseIndex = tempPc;
             }
 
             if ((instr.contains("If") && !instr.contains("Else")) || instr.contains("While") || instr.contains("For")) {
@@ -535,15 +549,13 @@ public class Translator {
 
         Wrapper retval = new Wrapper();
         if (cond.equals(new Wrapper(true))) {   
-            for (int i = blockPc + 1; i < tempPc; i++) {
+            for (int i = blockPc + 1; i < elseIndex; i++) {
                 retval = parseString(lines.get(i), scope + 1, i, funcVarList);
             }
-        } 
 
-        if (lines.get(tempPc).contains("Else")) {
-            blockPc = tempPc-1;
+            blockPc = tempPc + 1;
         } else {
-            blockPc = tempPc;
+            blockPc = elseIndex;
         }
 
         retval.setProgramCounter(blockPc);
@@ -552,6 +564,7 @@ public class Translator {
     }
     
     public static Wrapper handleCondElse(String condition, int scope, int blockPc, HashMap<String, Wrapper> funcVarList) {
+        System.out.println("Else");
         Wrapper retval = new Wrapper();
         if (!condition.equals("")) {
             Pattern p = Pattern.compile("If (.*) Then");
@@ -567,8 +580,8 @@ public class Translator {
         return retval;
     }
 
-    public static int handleEnd() {
-        System.err.println("Parsing Error in line " + (pc + 1) + ": Unbounded End");
+    public static int handleEnd(int blockPc) {
+        System.err.println("Parsing Error in line " + (blockPc + 1) + ": Unbounded End");
         System.exit(1);
         return -1;
     }

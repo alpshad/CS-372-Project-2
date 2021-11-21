@@ -53,7 +53,8 @@ public class Translator {
     }
 
     public static Wrapper parseString(String instruction, int scope, int tempPC, HashMap<String, Wrapper> funcVarList) {
-        System.out.println("Instruction: " + instruction);
+        // System.out.println("Instruction: " + instruction);
+        // System.out.println("Temp pc: "+(tempPC+1));
         instruction = instruction.strip();
         Pattern assignment = Pattern.compile("(\\b[a-z]+[A-Za-z0-9]*\\b) ?= ?(.+)");
         Pattern say = Pattern.compile("((?:Say|SaySame)) (.*)");
@@ -109,7 +110,6 @@ public class Translator {
             return new Wrapper(0, handleFuncDecl(funcDeclMatch.group(1), funcDeclMatch.group(2), scope));
         } else if (condElseMatch.find()) {
             // Conditional Else
-            System.out.println("Else match");
             if (!condElseMatch.group(0).equals(instruction)) {
                 System.err.println("Syntax error executing line " + (tempPC + 1) +  " (Invalid Else conditional): " + instruction);
                 System.exit(1);
@@ -117,7 +117,6 @@ public class Translator {
 
             return handleCondElse(condElseMatch.group(1), scope, tempPC, funcVarList);
         } else if (condFirstMatch.find()) {
-            System.out.println("Cond match");
             // Conditional If Then
             if (!condFirstMatch.group(0).equals(instruction)) {
                 System.err.println("Syntax error executing line " + (tempPC + 1) + " (Invalid If header): " + instruction);
@@ -500,18 +499,19 @@ public class Translator {
         newFuncList.putAll(f.varList);
 
         Wrapper retval = new Wrapper();
-        for (int i : f.lineNumbers) {
-            System.out.println("Func line #: " +i);
-        }
+        // for (int i = 0; i < f.lineNumbers.size(); i++) {
+        //     System.out.println("Func line: " + f.lines.get(i));
+        //     System.out.println("Func line #: " +f.lineNumbers.get(i));
+        // }
         
         // Run Function block
         for (int i = 0; i < f.lines.size(); i++) {
+            System.out.println("i " + (i));
             System.out.println("line: " + f.lines.get(i));
             retval = parseString(f.lines.get(i), scope, f.lineNumbers.get(i), newFuncList);
             System.out.println(i);
-            System.out.println("retval pc: " + (retval.getProgramCounter()+1));
-            i = retval.getProgramCounter();
-            System.out.println("What the fuck " + (i+1));
+            System.out.println("retval pc: " + (retval.getProgramCounter()));
+            i = retval.getProgramCounter()-f.lineNumbers.get(0);
         }
 
         retval.setProgramCounter(blockPc);
@@ -546,16 +546,31 @@ public class Translator {
 
             tempPc++;
         }
+        System.out.println(lines.get(tempPc));
+
+        if (elseIndex == 0) {
+            elseIndex = tempPc+1; // End index
+        }
+        System.out.println("Else index: "+(elseIndex+1));
 
         Wrapper retval = new Wrapper();
-        if (cond.equals(new Wrapper(true))) {   
-            for (int i = blockPc + 1; i < elseIndex; i++) {
+        if (cond.equals(new Wrapper(true))) {
+            System.out.println("True cond");
+            System.out.println("block pc " + (blockPc+1));
+            for (int i = blockPc + 1; i <= elseIndex; i++) {
                 retval = parseString(lines.get(i), scope + 1, i, funcVarList);
             }
+            System.out.println("Temp pc: " + tempPc);
 
-            blockPc = tempPc + 1;
+            blockPc = tempPc; // Set equal to End index
+
         } else {
-            blockPc = elseIndex;
+            
+            if (elseIndex == tempPc + 1) {
+                blockPc = elseIndex;
+            } else {
+                blockPc = elseIndex-1;
+            }
         }
 
         retval.setProgramCounter(blockPc);
@@ -564,7 +579,6 @@ public class Translator {
     }
     
     public static Wrapper handleCondElse(String condition, int scope, int blockPc, HashMap<String, Wrapper> funcVarList) {
-        System.out.println("Else");
         Wrapper retval = new Wrapper();
         if (!condition.equals("")) {
             Pattern p = Pattern.compile("If (.*) Then");

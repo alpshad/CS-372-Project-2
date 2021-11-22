@@ -506,11 +506,11 @@ public class Translator {
         
         // Run Function block
         for (int i = 0; i < f.lines.size(); i++) {
-            System.out.println("i " + (i));
-            System.out.println("line: " + f.lines.get(i));
+            //System.out.println("i " + (i));
+            //System.out.println("line: " + f.lines.get(i));
             retval = parseString(f.lines.get(i), scope, f.lineNumbers.get(i), newFuncList);
-            System.out.println(i);
-            System.out.println("retval pc: " + (retval.getProgramCounter()));
+            //System.out.println(i);
+            //System.out.println("retval pc: " + (retval.getProgramCounter()));
             i = retval.getProgramCounter()-f.lineNumbers.get(0);
         }
 
@@ -519,7 +519,7 @@ public class Translator {
     }
 
     public static Wrapper handleCondFirst(String condition, int scope, int blockPc, HashMap<String, Wrapper> funcVarList) {
-        System.out.println("Cond block PC: " + (blockPc +1));
+        //System.out.println("Cond block PC: " + (blockPc +1));
         Wrapper cond = evaluateExpr(condition, scope, pc, funcVarList);
 
         Stack<Integer> blocks = new Stack<Integer>();
@@ -546,30 +546,34 @@ public class Translator {
 
             tempPc++;
         }
-        System.out.println(lines.get(tempPc));
+        //System.out.println(lines.get(tempPc));
 
         if (elseIndex == 0) {
-            elseIndex = tempPc+1; // End index
+            elseIndex = tempPc; // End index
         }
-        System.out.println("Else index: "+(elseIndex+1));
+        //System.out.println("Else index: "+(elseIndex+1));
 
         Wrapper retval = new Wrapper();
         if (cond.equals(new Wrapper(true))) {
-            System.out.println("True cond");
-            System.out.println("block pc " + (blockPc+1));
-            for (int i = blockPc + 1; i <= elseIndex; i++) {
+            //System.out.println("True cond");
+            //System.out.println("block pc " + (blockPc+1));
+            for (int i = blockPc + 1; i < elseIndex; i++) {
                 retval = parseString(lines.get(i), scope + 1, i, funcVarList);
             }
-            System.out.println("Temp pc: " + tempPc);
+            //System.out.println("Temp pc: " + tempPc);
 
-            blockPc = tempPc; // Set equal to End index
+            if (elseIndex == tempPc) {
+                blockPc = elseIndex + 1;
+            } else {
+                System.out.println("Else statement found");
+                blockPc = elseIndex - 1; 
+            }
 
         } else {
-            
-            if (elseIndex == tempPc + 1) {
-                blockPc = elseIndex;
+            if (elseIndex == tempPc) {
+                blockPc = elseIndex + 1;
             } else {
-                blockPc = elseIndex-1;
+                blockPc = elseIndex - 1;
             }
         }
 

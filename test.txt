@@ -17,6 +17,9 @@ End
 
 xFiles = 2
 Say xFiles
-doStuff
+While xFiles < 10 Do
+    xFiles = xFiles + 1
+    Say xFiles
+End
 //Say "General Kenobi"
 //Say "Amy", add 1,2

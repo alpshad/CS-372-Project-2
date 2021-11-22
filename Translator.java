@@ -6,6 +6,7 @@ import java.util.List;
 import java.util.ArrayList;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
+import java.util.zip.Inflater;
 
 public class Translator {
     public static HashMap<String, Wrapper> varList;
@@ -53,13 +54,13 @@ public class Translator {
     }
 
     public static Wrapper parseString(String instruction, int scope, int tempPC, HashMap<String, Wrapper> funcVarList) {
-        // System.out.println("Instruction: " + instruction);
-        // System.out.println("Temp pc: "+(tempPC+1));
+        //System.out.println("Instruction: " + instruction);
+        //System.out.println("Temp pc: "+(tempPC+1));
         instruction = instruction.strip();
         Pattern assignment = Pattern.compile("(\\b[a-z]+[A-Za-z0-9]*\\b) ?= ?(.+)");
         Pattern say = Pattern.compile("((?:Say|SaySame)) (.*)");
-        Pattern funcDecl = Pattern.compile("Func (\\b[a-z]+[A-Za-z0-9]*\\b) ?(([a-z]+[^,]*,?)*)"); // Then split on commas
-        Pattern funcUse = Pattern.compile("(\\b[a-z]+[A-Za-z0-9]*\\b) ?(([^,]*,?)*)");
+        Pattern funcDecl = Pattern.compile("Func (\\b[a-z]+[A-Za-z0-9]*\\b) ?(([a-z]+[^,]*,? ?)*)"); // Then split on commas
+        Pattern funcUse = Pattern.compile("(\\b[a-z]+[A-Za-z0-9]*\\b) ?(([^,]*,? ?)*)");
         Pattern condFirst = Pattern.compile("If (.*) Then");
         Pattern condElse = Pattern.compile("Else ?(.*)");
         Pattern end = Pattern.compile("End");
@@ -79,7 +80,7 @@ public class Translator {
         Matcher returnStatMatch = returnStat.matcher(instruction);
 
         if (instruction.startsWith("//")) {
-            return new Wrapper(0, pc);
+            return new Wrapper(0, tempPC);
         } else if (sayMatch.find()) {
             // Print statement
             if (!sayMatch.group(0).equals(instruction)) {
@@ -95,7 +96,7 @@ public class Translator {
                 System.exit(1);
             }
 
-            return handleReturnStat(returnStatMatch.group(1), scope, funcVarList);
+            return handleReturnStat(returnStatMatch.group(1), scope, tempPC, funcVarList);
         } else if (funcDeclMatch.find()) {
             // Function Declaration
             if (!funcDeclMatch.group(0).equals(instruction)) {
@@ -103,10 +104,11 @@ public class Translator {
                 System.exit(1);
             }
 
-            if (funcDeclMatch.group(2) != null) {
+            if (funcDeclMatch.group(2) == null) {
                 return new Wrapper(0, handleFuncDecl(funcDeclMatch.group(1), "", scope));
             }
 
+            //System.out.println(funcDeclMatch.group(2));
             return new Wrapper(0, handleFuncDecl(funcDeclMatch.group(1), funcDeclMatch.group(2), scope));
         } else if (condElseMatch.find()) {
             // Conditional Else
@@ -178,6 +180,7 @@ public class Translator {
 
     public static Wrapper evaluateExpr(String expr, int scope, int tempPC, HashMap<String, Wrapper> funcVarList) {
         expr = expr.strip();
+        //System.out.println(funcVarList);
 
         // Priority order: Func call, == / And / Or / Xor / Comparison, / / *, + / -
         if (funcVarList != null && funcVarList.get(expr) != null) {
@@ -216,7 +219,9 @@ public class Translator {
                         System.exit(1);
                     }
 
-                    return new Wrapper(left.and(right));
+                    Wrapper temp =  new Wrapper(left.and(right));
+                    temp.setProgramCounter(tempPC);
+                    return temp;
                 }
 
                 if (operator.equals("Or")) {
@@ -226,7 +231,9 @@ public class Translator {
                         System.exit(1);
                     }
 
-                    return new Wrapper(left.or(right));
+                    Wrapper temp =  new Wrapper(left.or(right));
+                    temp.setProgramCounter(tempPC);
+                    return temp;
                 }
 
                 if (operator.equals("Xor")) {
@@ -236,12 +243,15 @@ public class Translator {
                         System.exit(1);
                     }
 
-                    return new Wrapper(left.xor(right));
+                    Wrapper temp =  new Wrapper(left.xor(right));
+                    temp.setProgramCounter(tempPC);
+                    return temp;
                 }
 
                 if (operator.equals("==")) {
-                    // Check types: numeric or string
-                    return new Wrapper(left.equals(right));
+                    Wrapper temp =  new Wrapper(left.equals(right));
+                    temp.setProgramCounter(tempPC);
+                    return temp;
                 }
 
                 if (operator.equals("<=")) {
@@ -251,7 +261,9 @@ public class Translator {
                         System.exit(1);
                     }
 
-                    return new Wrapper(left.leq(right));
+                    Wrapper temp =  new Wrapper(left.leq(right));
+                    temp.setProgramCounter(tempPC);
+                    return temp;
                 }
 
                 if (operator.equals(">=")) {
@@ -261,7 +273,9 @@ public class Translator {
                         System.exit(1);
                     }
 
-                    return new Wrapper(left.geq(right));
+                    Wrapper temp =  new Wrapper(left.geq(right));
+                    temp.setProgramCounter(tempPC);
+                    return temp;
                 }
 
                 if (operator.equals("<")) {
@@ -271,7 +285,9 @@ public class Translator {
                         System.exit(1);
                     }
 
-                    return new Wrapper(left.less(right));
+                    Wrapper temp =  new Wrapper(left.less(right));
+                    temp.setProgramCounter(tempPC);
+                    return temp;
                 }
 
                 if (operator.equals(">")) {
@@ -281,7 +297,9 @@ public class Translator {
                         System.exit(1);
                     }
 
-                    return new Wrapper(left.greater(right));
+                    Wrapper temp =  new Wrapper(left.greater(right));
+                    temp.setProgramCounter(tempPC);
+                    return temp;
                 }
 
                 System.err.println("Error evaluating expression: " + operator);
@@ -295,7 +313,9 @@ public class Translator {
                     System.exit(1);
                 }
 
-                return new Wrapper(value.not());
+                Wrapper temp =  new Wrapper(value.not());
+                temp.setProgramCounter(tempPC);
+                return temp;
             } else if (thirdOrderMatch.find() && thirdOrderMatch.group(0).length() == expr.length()) {
                 Wrapper left = evaluateExpr(thirdOrderMatch.group(1).strip(), scope, tempPC, funcVarList);
                 Wrapper right = evaluateExpr(thirdOrderMatch.group(3).strip(), scope, tempPC, funcVarList);
@@ -308,7 +328,9 @@ public class Translator {
                         System.exit(1);
                     }
 
-                    return new Wrapper(left.div(right));
+                    Wrapper temp =  new Wrapper(left.div(right));
+                    temp.setProgramCounter(tempPC);
+                    return temp;
                 }
 
                 if (operator.equals("*")) {
@@ -318,7 +340,9 @@ public class Translator {
                         System.exit(1);
                     }
 
-                    return new Wrapper(left.mult(right));
+                    Wrapper temp =  new Wrapper(left.mult(right));
+                    temp.setProgramCounter(tempPC);
+                    return temp;
                 }
 
                 if (operator.equals("%")) {
@@ -328,7 +352,9 @@ public class Translator {
                         System.exit(1);
                     }
 
-                    return new Wrapper(left.mod(right));
+                    Wrapper temp =  new Wrapper(left.mod(right));
+                    temp.setProgramCounter(tempPC);
+                    return temp;
                 }
             } else if (fourthOrderMatch.find() && fourthOrderMatch.group(0).length() == expr.length()) {
                 Wrapper left = evaluateExpr(fourthOrderMatch.group(1).strip(), scope, tempPC, funcVarList);
@@ -342,17 +368,21 @@ public class Translator {
                         System.exit(1);
                     }
 
-                    return new Wrapper(left.add(right));
+                    Wrapper temp =  new Wrapper(left.add(right));
+                    temp.setProgramCounter(tempPC);
+                    return temp;
                 }
 
                 if (operator.equals("-")) {
                     if (!(left.isNumeric() && right.isNumeric())) {
                         // Error
-                        System.err.println("Type Error : - must be used on numeric types");
+                        System.err.println("Type Error: - must be used on numeric types");
                         System.exit(1);
                     }
 
-                    return new Wrapper(left.sub(right));
+                    Wrapper temp =  new Wrapper(left.sub(right));
+                    temp.setProgramCounter(tempPC);
+                    return temp;
                 }
             } else if (funcMatch.find() && funcMatch.group(0).length() == expr.length()) {
                 return handleFuncUse(funcMatch.group(1), funcMatch.group(2), scope, tempPC, funcVarList);
@@ -366,7 +396,7 @@ public class Translator {
     }
 
     public static Wrapper handleAssg(String left, String right, int scope, int blockPc, HashMap<String, Wrapper> funcVarList) {
-        Wrapper val = evaluateExpr(right, scope, pc, null);
+        Wrapper val = evaluateExpr(right, scope, pc, funcVarList);
         varList.put(left, val);
         val.setProgramCounter(blockPc);
         return val;
@@ -393,7 +423,7 @@ public class Translator {
 
         String printable = "";
         for (String item : items) {
-            Wrapper toPrint = evaluateExpr(item, scope, pc, null);
+            Wrapper toPrint = evaluateExpr(item, scope, pc, funcVarList);
             printable += toPrint.toString() + " ";
         }
 
@@ -438,10 +468,14 @@ public class Translator {
             }
         }
         
+        //System.out.println(parameters);
         String[] indivParams = parameters.split("(?:, |,)");
+        int i = 0;
         for (String param : indivParams) {
+            System.out.println("Param " + i + ": " + param);
             localVarList.put(param, null);
             paramOrder.insert(param);
+            i++;
         }
 
         Func f = new Func(name, localLines, localVarList, paramOrder, lineNumbers);
@@ -460,6 +494,7 @@ public class Translator {
         if (!parameters.equals("")) {
             Pattern funcCall = Pattern.compile("(\\b[a-z]+[A-Za-z0-9]*\\b) ?(([^,]*,?)*)");
             Matcher funcMatch = funcCall.matcher(parameters);
+            System.out.println(parameters);
             String[] indivParams;
             if (funcMatch.find()) {
                 String[] nonFunc = parameters.split(funcMatch.group(0));
@@ -473,6 +508,8 @@ public class Translator {
             } else {
                 indivParams = parameters.split("(?:, |,)");
             }
+
+            for (String param: indivParams) System.out.println(param);
 
             if (indivParams.length != f.paramOrder.size()) {
                 // Syntax error
@@ -504,6 +541,8 @@ public class Translator {
         for (int i = 0; i < f.lines.size(); i++) {
             retval = parseString(f.lines.get(i), scope, f.lineNumbers.get(i), newFuncList);
             i = retval.getProgramCounter()-f.lineNumbers.get(0);
+            //System.out.println(retval.getProgramCounter());
+            //System.out.println(i);
         }
 
         retval.setProgramCounter(blockPc);
@@ -632,6 +671,14 @@ public class Translator {
             System.exit(1);
         }
 
+        //System.out.println(varName);
+        HashMap<String, Wrapper> newFuncList = new HashMap<String, Wrapper>();
+        if (funcVarList != null) {
+            newFuncList.putAll(funcVarList);
+        }
+
+        newFuncList.put(varName, startVal);
+        //System.out.println(newFuncList);
         Stack<Integer> blocks = new Stack<Integer>();
         int forEnd = blockPc + 1;
         while (!(lines.get(forEnd).contains("End") && blocks.empty())) {
@@ -655,18 +702,19 @@ public class Translator {
         Wrapper retval = new Wrapper();
         while (new Wrapper(startVal.leq(endVal)).equals(new Wrapper(true))) {
             for (int i = blockPc + 1; i < forEnd; i++) {
-                retval = parseString(lines.get(i), scope, i, funcVarList);
+                retval = parseString(lines.get(i), scope, i, newFuncList);
             }
 
             startVal = new Wrapper(startVal.add(new Wrapper(1))); // Increment list index
+            newFuncList.put(varName, startVal);
         }
 
         retval.setProgramCounter(forEnd);
         return retval;
     }
 
-    public static Wrapper handleReturnStat(String expr, int scope, HashMap<String, Wrapper> funcVarList) {
-        Wrapper retval = evaluateExpr(expr, scope, pc, funcVarList);
+    public static Wrapper handleReturnStat(String expr, int scope, int tempPC, HashMap<String, Wrapper> funcVarList) {
+        Wrapper retval = evaluateExpr(expr, scope, tempPC, funcVarList);
         return retval;
     }
 }

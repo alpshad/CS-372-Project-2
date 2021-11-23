@@ -1,0 +1,8 @@
+// Program that throws a parse error due to an unsupported command
+
+x = 5
+If x == 0 Then
+    Say "Hello nobody!"
+Else
+    Print "Hello somebody!"
+End

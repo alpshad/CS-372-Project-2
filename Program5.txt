@@ -1,0 +1,7 @@
+// Program that throws a parse error due to an unsupported colon on
+// the While loop condition.
+
+i = 0
+While i < 5:
+    Say i
+End

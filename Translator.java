@@ -1,20 +1,21 @@
 import java.io.*;
 import java.util.Scanner;
 import java.util.Stack;
-import java.util.function.Function;
 import java.util.HashMap;
 import java.util.List;
 import java.util.ArrayList;
-import java.util.EventListener;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
+import java.util.zip.Inflater;
 
 public class Translator {
     public static HashMap<String, Wrapper> varList;
     public static HashMap<String, Func> funcList;
     public static List<String> lines;
+    public static int pc;
     public static void main(String[] args) {
         funcList = new HashMap<String, Func>();
+        varList = new HashMap<String, Wrapper>();
         try {
             File program = new File(args[0]);
             Scanner scan = new Scanner(program);
@@ -23,7 +24,12 @@ public class Translator {
             while (scan.hasNextLine()) lines.add(scan.nextLine());
             scan.close();
 
-            for(String line : lines) System.out.println(line);
+            // Add command line args to the list of variables
+            for (int i = 1; i < args.length; i++) {
+                varList.put("a" + i, new Wrapper(args[i]));
+            }
+
+            varList.put("a#", new Wrapper(args.length - 1)); // Total number of command line args
 
             readFile(lines);
         } catch (FileNotFoundException e) {
@@ -33,83 +39,33 @@ public class Translator {
 
     // Reads through globally-scoped lines
     public static void readFile(List<String> lines) {
-        int pc = 0; // Program counter
-        Stack<Integer> loopStart = new Stack<Integer>();
-        Stack<Integer> blockStart = new Stack<Integer>();
-        boolean blockFlag = false;
-        boolean loop = false;
+        pc = 0; // Program counter
         while (pc < lines.size()) {
-            // When find loop: Keep track of initial index, then keep running statements
-            // When find end of loop: set current to initial index
-            // Do regex
-            // If line is start of block (func, cond, loop) then execute all statements in block
             String instruction = lines.get(pc);
-            pc = parseString(instruction, pc, blockFlag, 0); // regular, loop, funcdecl, blockend
-            // if (type == 1) {
-            //     // Loop
-            //     loopStart.push(pc);
-            //     blockStart.push(pc);
-            //     blockFlag = true;
-            //     loop = true;
-            // } else if (type == 2) {
-            //     // Func Decl
-            //     List<String> interior = new ArrayList<String>();
-            //     blockFlag = true;
-            // } else if (type == 3 && loop) {
-            //     // End of Loop -- CHECK ON CONDITIONS
-            //     pc = loopStart.pop();
-            //     loop = !loopStart.isEmpty();
-            //     blockStart.pop();
-            //     blockFlag = !blockStart.isEmpty();
-            // }
+            if (instruction.equals("")) {
+                pc++;
+                continue;
+            }
 
-            /*
-            globalVarList<String, Wrapper>;
-            scopedVarList<String, Wrapper>;
-            funcList<String, DynamicArray<String>>;
-            globalVarList: [
-                
-            ]
-            scopedVarList:[
-                "x": 1,
-                "y": 3
-            ]
-            funcList: [
-                "add": [{"x": , "y", }, startLine {1}, endLine {2}]
-            ]
-
-            Lines to execute:
-
-            0  Func add x,y readfile
-            1     Return x+y  funchandler
-            2  End funchandler - kicks out to readfile
-            3
-            4  Say "HI" readfile
-            5  z = 3    readfile
-            6  For i = 1 to 10 Do loopstart = 2  readfile
-            7     Say "Hi"   forhandler
-            8     x = add 1, 3    forhandler
-            9     Say "x is", x   forhandler
-            10    For j = 1 to 10 Do    forhandler
-            11        ....        forhandler_v2
-            12    End
-            10 End
-            11 
-            */
+            Wrapper pcWrap = parseString(instruction, 0, pc, null);
+            pc = pcWrap.getProgramCounter();
             pc++;
         }
     }
 
-    public static int parseString(String instruction, int pc, boolean funcFlag, int scope) {
-        Pattern assignment = Pattern.compile("(\\b[a-z]+[^\\S]*\\b) ?= ?(.+)");
+    public static Wrapper parseString(String instruction, int scope, int tempPC, HashMap<String, Wrapper> funcVarList) {
+        //System.out.println("Instruction: " + instruction);
+        //System.out.println("Temp pc: "+(tempPC+1));
+        instruction = instruction.strip();
+        Pattern assignment = Pattern.compile("(\\b[a-z]+[A-Za-z0-9]*\\b) ?= ?(.+)");
         Pattern say = Pattern.compile("((?:Say|SaySame)) (.*)");
-        Pattern funcDecl = Pattern.compile("Func ([a-z]+) (([a-z]+[^,]*,?)*)"); // Then split on commas
-        Pattern funcUse = Pattern.compile("([a-z]+) (([^,]*,?)*)");
+        Pattern funcDecl = Pattern.compile("Func (\\b[a-z]+[A-Za-z0-9]*\\b) ?(([a-z]+[^,]*,? ?)*)"); // Then split on commas
+        Pattern funcUse = Pattern.compile("(\\b[a-z]+[A-Za-z0-9]*\\b) ?(([^,]*,? ?)*)");
         Pattern condFirst = Pattern.compile("If (.*) Then");
         Pattern condElse = Pattern.compile("Else ?(.*)");
         Pattern end = Pattern.compile("End");
         Pattern whileFirst = Pattern.compile("While (.*) Do");
-        Pattern forFirst = Pattern.compile("For (\\b[a-z]+[^\\S]*\\b) ?= ?(.+) To (.+) Do");
+        Pattern forFirst = Pattern.compile("For (\\b[a-z]+[A-Za-z0-9]*\\b) ?= ?(.+) To (.+) Do");
         Pattern returnStat = Pattern.compile("Return (.*)");
 
         Matcher assgMatch = assignment.matcher(instruction);
@@ -123,141 +79,114 @@ public class Translator {
         Matcher forFirstMatch = forFirst.matcher(instruction);
         Matcher returnStatMatch = returnStat.matcher(instruction);
 
-        if (assgMatch.find()) {
-            // Assignment statement
-            if (!assgMatch.group(0).equals(instruction)) {
-                System.err.println("Syntax error in line (Invalid assignment): " + instruction);
-                System.exit(1);
-            }
-
-            handleAssg(assgMatch.group(1), assgMatch.group(2), scope);
+        if (instruction.startsWith("//")) {
+            return new Wrapper(0, tempPC);
         } else if (sayMatch.find()) {
             // Print statement
             if (!sayMatch.group(0).equals(instruction)) {
-                System.err.println("Syntax error in line (Invalid Say invocation): " + instruction);
+                System.err.println("Syntax error executing line " + (tempPC + 1) + " (Invalid Say invocation): " + instruction);
                 System.exit(1);
             }
 
-            handleSay(assgMatch.group(1), assgMatch.group(2), scope);
-        } else if (funcDeclMatch.find()) {
-            // Function Declaration
-            if (!funcDeclMatch.group(0).equals(instruction)) {
-                System.err.println("Syntax error in line (Invalid Func declaration): " + instruction);
-                System.exit(1);
-            }
-
-            handleFuncDecl(funcDeclMatch.group(1), funcDeclMatch.group(2), pc);
-        } else if (funcUseMatch.find()) {
-            // Function use
-            if (!funcUseMatch.group(0).equals(instruction)) {
-                System.err.println("Syntax error in line (Invalid function usage): " + instruction);
-                System.exit(1);
-            }
-
-            handleFuncUse(funcUseMatch.group(1), funcUseMatch.group(2));
-        } else if (condFirstMatch.find()) {
-            // Conditional If Then
-            if (!condFirstMatch.group(0).equals(instruction)) {
-                System.err.println("Syntax error in line (Invalid If header): " + instruction);
-                System.exit(1);
-            }
-
-<<<<<<< HEAD
-            handleCondFirst(condFirstMatch.group(1), pc);
-=======
-            handleCondFirst(condFirstMatch.group(1), scope);
->>>>>>> 1d34fbb1d0532ba042a0d53b5c33dc4e5f83ba95
-        } else if (condElseMatch.find()) {
-            // Conditional Else
-            if (!condElseMatch.group(0).equals(instruction)) {
-                System.err.println("Syntax error in line (Invalid Else conditional): " + instruction);
-                System.exit(1);
-            }
-
-<<<<<<< HEAD
-            handleCondElse(condElseMatch.group(1), pc);
-=======
-            handleCondElse(condElseMatch.group(1), scope);
->>>>>>> 1d34fbb1d0532ba042a0d53b5c33dc4e5f83ba95
-        } else if (endMatch.find()) {
-            // End of block
-            if (!endMatch.group(0).equals(instruction)) {
-                System.err.println("Syntax error in line (Invalid End of block): " + instruction);
-                System.exit(1);
-            }
-
-            handleEnd();
-        } else if (whileFirstMatch.find()) {
-            // While loop header
-            if (!whileFirstMatch.group(0).equals(instruction)) {
-                System.err.println("Syntax error in line (Invalid While loop header): " + instruction);
-                System.exit(1);
-            }
-
-<<<<<<< HEAD
-            handleWhileFirst(whileFirstMatch.group(1), pc);
-=======
-            handleWhileFirst(whileFirstMatch.group(1), scope);
->>>>>>> 1d34fbb1d0532ba042a0d53b5c33dc4e5f83ba95
-        } else if (forFirstMatch.find()) {
-            // For loop header
-            if (!forFirstMatch.group(0).equals(instruction)) {
-                System.err.println("Syntax error in line (Invalid For loop header): " + instruction);
-                System.exit(1);
-            }
-
-<<<<<<< HEAD
-            handleForFirst(forFirstMatch.group(1), forFirstMatch.group(2), forFirstMatch.group(3), pc);
-=======
-            handleForFirst(forFirstMatch.group(1), forFirstMatch.group(2), forFirstMatch.group(3), scope);
->>>>>>> 1d34fbb1d0532ba042a0d53b5c33dc4e5f83ba95
+            return handleSay(sayMatch.group(1), sayMatch.group(2), scope, tempPC, funcVarList);
         } else if (returnStatMatch.find()) {
             // Return statement
             if (!returnStatMatch.group(0).equals(instruction)) {
-                System.err.println("Syntax error in line (Invalid Return statement): " + instruction);
+                System.err.println("Syntax error executing line " + (tempPC + 1) + " (Invalid Return statement): " + instruction);
                 System.exit(1);
             }
 
-            handleReturnStat(returnStatMatch.group(1), pc);
-        } else if (instruction.startsWith("//")) {
-            return pc;
+            return handleReturnStat(returnStatMatch.group(1), scope, tempPC, funcVarList);
+        } else if (funcDeclMatch.find()) {
+            // Function Declaration
+            if (!funcDeclMatch.group(0).equals(instruction)) {
+                System.err.println("Syntax error executing line " + (tempPC + 1) + " (Invalid Func declaration): " + instruction);
+                System.exit(1);
+            }
+
+            if (funcDeclMatch.group(2) == null) {
+                return new Wrapper(0, handleFuncDecl(funcDeclMatch.group(1), "", scope));
+            }
+
+            //System.out.println(funcDeclMatch.group(2));
+            return new Wrapper(0, handleFuncDecl(funcDeclMatch.group(1), funcDeclMatch.group(2), scope));
+        } else if (condElseMatch.find()) {
+            // Conditional Else
+            if (!condElseMatch.group(0).equals(instruction)) {
+                System.err.println("Syntax error executing line " + (tempPC + 1) +  " (Invalid Else conditional): " + instruction);
+                System.exit(1);
+            }
+
+            return handleCondElse(condElseMatch.group(1), scope, tempPC, funcVarList);
+        } else if (condFirstMatch.find()) {
+            // Conditional If Then
+            if (!condFirstMatch.group(0).equals(instruction)) {
+                System.err.println("Syntax error executing line " + (tempPC + 1) + " (Invalid If header): " + instruction);
+                System.exit(1);
+            }
+
+            return handleCondFirst(condFirstMatch.group(1), scope, tempPC, funcVarList);
+        } else if (endMatch.find()) {
+            // End of block
+            if (!endMatch.group(0).equals(instruction)) {
+                System.err.println("Syntax error executing line " + (tempPC + 1) + " (Invalid End of block): " + instruction);
+                System.exit(1);
+            }
+
+            handleEnd(tempPC);
+        } else if (whileFirstMatch.find()) {
+            // While loop header
+            if (!whileFirstMatch.group(0).equals(instruction)) {
+                System.err.println("Syntax error executing line " + (tempPC + 1) + " (Invalid While loop header): " + instruction);
+                System.exit(1);
+            }
+
+            return handleWhileFirst(whileFirstMatch.group(1), scope, tempPC, funcVarList);
+        } else if (forFirstMatch.find()) {
+            // For loop header
+            if (!forFirstMatch.group(0).equals(instruction)) {
+                System.err.println("Syntax error executing line " + (tempPC + 1) + " (Invalid For loop header): " + instruction);
+                System.exit(1);
+            }
+
+            return handleForFirst(forFirstMatch.group(1), forFirstMatch.group(2), forFirstMatch.group(3), scope, tempPC, funcVarList);
+        } else if (assgMatch.find()) {
+            // Assignment statement
+            if (!assgMatch.group(0).equals(instruction)) {
+                System.err.println("Syntax error executing line " + (tempPC + 1) + " (Invalid assignment): " + instruction);
+                System.exit(1);
+            }
+
+            return handleAssg(assgMatch.group(1), assgMatch.group(2), scope, tempPC, funcVarList);
+        } else if (funcUseMatch.find()) {
+            // Function use
+            if (!funcUseMatch.group(0).equals(instruction)) {
+                System.err.println("Syntax error executing line " + (tempPC + 1) + " (Invalid function usage): " + instruction);
+                System.exit(1);
+            }
+
+            return handleFuncUse(funcUseMatch.group(1), funcUseMatch.group(2), scope, tempPC, funcVarList);
         } else {
-            System.err.println("Syntax error in line (Invalid expression): \n" + instruction);
+            System.err.println("Syntax error executing line " + (tempPC + 1) + " (Invalid expression): \n" + instruction);
             System.exit(1);
         }
-        return pc;
+
+        return new Wrapper(0, tempPC);
     }
-
-    // public static void say(String[] message) {
-    //     for (int i = 0; i < message.length; i++) {
-    //         message[i].replace(",", "");
-    //         if (message[i].startsWith("\"") && message[i].endsWith("\"")) {
-    //             System.out.print(message[i] + " ");
-    //             continue;
-    //         } else if (message[i].startsWith("\"") || message[i].endsWith("\"")) {
-    //             // Malformed Literal Input
-    //             // THROW SYNTAX ERROR
-    //         }
-    //         if (varList.containsKey(message[i])) {
-    //             // Where varList is a hashmap mapping variable names to their values
-    //             System.out.print(varList.get(message[i]) + " ");
-    //         }
-
-    //         System.out.print(message[i] + " ");
-    //     }
-    //     System.out.println();
-    // }
 
     public static boolean isNumeric(String str) {
-        return str != null && str.matches("[-+]?\\d*\\.?\\d+");
+        return str != null && str.matches("-?\\d+");
     }
 
-    public static Wrapper evaluateExpr(String expr, int scope) {
-        // expr = x + y == 5
-        // Recurse into lowest forms -- left associative
-        // Check regex in order of priority
-        // Then attempt to wrap, if not successful or variable, throw error
+    public static Wrapper evaluateExpr(String expr, int scope, int tempPC, HashMap<String, Wrapper> funcVarList) {
+        expr = expr.strip();
+        //System.out.println(funcVarList);
+
         // Priority order: Func call, == / And / Or / Xor / Comparison, / / *, + / -
+        if (funcVarList != null && funcVarList.get(expr) != null) {
+            return funcVarList.get(expr);
+        }
+        
         Wrapper varVal = varList.get(expr);
         if (varVal != null && varVal.getScope() <= scope) {
             return varVal;
@@ -266,33 +195,33 @@ public class Translator {
         try {
             Wrapper value = new Wrapper(expr);
             return value;
-        } catch (Exception e) {
+        } catch (UnsupportedTypeException e) {
             Pattern funcCall = Pattern.compile("([a-z]+) (([^,]*,?)*)");
             Pattern secondOrder = Pattern.compile("(.*) ?((?:And|Or|Xor|==|<=|>=|<|>)) ?(.*)"); // Strip() afterward
             Pattern not = Pattern.compile("Not (.*)");
-            Pattern thirdOrder = Pattern.compile("(.*) ?((?:\\/|\\*)) ?(.*)"); // Strip()
+            Pattern thirdOrder = Pattern.compile("(.*) ?((?:\\/|\\*|\\%)) ?(.*)"); // Strip()
             Pattern fourthOrder = Pattern.compile("(.*) ?((?:\\+|-)) ?(.*)"); // Strip()
             Matcher funcMatch = funcCall.matcher(expr);
             Matcher secondOrderMatch = secondOrder.matcher(expr);
             Matcher notMatch = not.matcher(expr);
             Matcher thirdOrderMatch = thirdOrder.matcher(expr);
             Matcher fourthOrderMatch = fourthOrder.matcher(expr);
-            if (funcMatch.find() && funcMatch.group(0).length() == expr.length()) {
-                handleFuncUse(funcMatch.group(1), funcMatch.group(2));
-            } else if (secondOrderMatch.find() && secondOrderMatch.group(0).length() == expr.length()) {
-                Wrapper left = evaluateExpr(secondOrderMatch.group(1).strip(), scope);
-                Wrapper right = evaluateExpr(secondOrderMatch.group(3).strip(), scope);
+            if (secondOrderMatch.find() && secondOrderMatch.group(0).length() == expr.length()) {
+                Wrapper left = evaluateExpr(secondOrderMatch.group(1).strip(), scope, tempPC, funcVarList);
+                Wrapper right = evaluateExpr(secondOrderMatch.group(3).strip(), scope, tempPC, funcVarList);
 
                 String operator = secondOrderMatch.group(2).strip();
                 if (operator.equals("And")) {
                     // Variables must be booleans
                     if (!(left.isBoolean() && right.isBoolean())) {
                         // Error
-                        System.err.println("Type Error: And must be used on boolean types");
+                        System.err.println("Type Error on line " + (tempPC + 1) + " : And must be used on boolean types");
                         System.exit(1);
                     }
 
-                    return new Wrapper(left.and(right));
+                    Wrapper temp =  new Wrapper(left.and(right));
+                    temp.setProgramCounter(tempPC);
+                    return temp;
                 }
 
                 if (operator.equals("Or")) {
@@ -302,7 +231,9 @@ public class Translator {
                         System.exit(1);
                     }
 
-                    return new Wrapper(left.or(right));
+                    Wrapper temp =  new Wrapper(left.or(right));
+                    temp.setProgramCounter(tempPC);
+                    return temp;
                 }
 
                 if (operator.equals("Xor")) {
@@ -312,12 +243,15 @@ public class Translator {
                         System.exit(1);
                     }
 
-                    return new Wrapper(left.xor(right));
+                    Wrapper temp =  new Wrapper(left.xor(right));
+                    temp.setProgramCounter(tempPC);
+                    return temp;
                 }
 
                 if (operator.equals("==")) {
-                    // Check types: numeric or string
-                    return new Wrapper(left.equals(right));
+                    Wrapper temp =  new Wrapper(left.equals(right));
+                    temp.setProgramCounter(tempPC);
+                    return temp;
                 }
 
                 if (operator.equals("<=")) {
@@ -327,7 +261,9 @@ public class Translator {
                         System.exit(1);
                     }
 
-                    return new Wrapper(left.leq(right));
+                    Wrapper temp =  new Wrapper(left.leq(right));
+                    temp.setProgramCounter(tempPC);
+                    return temp;
                 }
 
                 if (operator.equals(">=")) {
@@ -337,7 +273,9 @@ public class Translator {
                         System.exit(1);
                     }
 
-                    return new Wrapper(left.geq(right));
+                    Wrapper temp =  new Wrapper(left.geq(right));
+                    temp.setProgramCounter(tempPC);
+                    return temp;
                 }
 
                 if (operator.equals("<")) {
@@ -347,7 +285,9 @@ public class Translator {
                         System.exit(1);
                     }
 
-                    return new Wrapper(left.less(right));
+                    Wrapper temp =  new Wrapper(left.less(right));
+                    temp.setProgramCounter(tempPC);
+                    return temp;
                 }
 
                 if (operator.equals(">")) {
@@ -357,13 +297,15 @@ public class Translator {
                         System.exit(1);
                     }
 
-                    return new Wrapper(left.greater(right));
+                    Wrapper temp =  new Wrapper(left.greater(right));
+                    temp.setProgramCounter(tempPC);
+                    return temp;
                 }
 
                 System.err.println("Error evaluating expression: " + operator);
                 System.exit(1);
             } else if (notMatch.find() && notMatch.group(0).length() == expr.length()) {
-                Wrapper value = evaluateExpr(notMatch.group(1), scope);
+                Wrapper value = evaluateExpr(notMatch.group(1), scope, tempPC, funcVarList);
                 // Check type -- boolean
                 if (!value.isBoolean()) {
                     // Error
@@ -371,10 +313,12 @@ public class Translator {
                     System.exit(1);
                 }
 
-                return new Wrapper(value.not());
+                Wrapper temp =  new Wrapper(value.not());
+                temp.setProgramCounter(tempPC);
+                return temp;
             } else if (thirdOrderMatch.find() && thirdOrderMatch.group(0).length() == expr.length()) {
-                Wrapper left = evaluateExpr(thirdOrderMatch.group(1).strip(), scope);
-                Wrapper right = evaluateExpr(thirdOrderMatch.group(3).strip(), scope);
+                Wrapper left = evaluateExpr(thirdOrderMatch.group(1).strip(), scope, tempPC, funcVarList);
+                Wrapper right = evaluateExpr(thirdOrderMatch.group(3).strip(), scope, tempPC, funcVarList);
 
                 String operator = thirdOrderMatch.group(2).strip();
                 if (operator.equals("/")) {
@@ -384,7 +328,9 @@ public class Translator {
                         System.exit(1);
                     }
 
-                    return new Wrapper(left.div(right));
+                    Wrapper temp =  new Wrapper(left.div(right));
+                    temp.setProgramCounter(tempPC);
+                    return temp;
                 }
 
                 if (operator.equals("*")) {
@@ -394,11 +340,25 @@ public class Translator {
                         System.exit(1);
                     }
 
-                    return new Wrapper(left.mult(right));
+                    Wrapper temp =  new Wrapper(left.mult(right));
+                    temp.setProgramCounter(tempPC);
+                    return temp;
+                }
+
+                if (operator.equals("%")) {
+                    if (!(left.isNumeric() && right.isNumeric())) {
+                        // Error
+                        System.err.println("Type Error: % must be used on numeric types");
+                        System.exit(1);
+                    }
+
+                    Wrapper temp =  new Wrapper(left.mod(right));
+                    temp.setProgramCounter(tempPC);
+                    return temp;
                 }
             } else if (fourthOrderMatch.find() && fourthOrderMatch.group(0).length() == expr.length()) {
-                Wrapper left = evaluateExpr(fourthOrderMatch.group(1), scope);
-                Wrapper right = evaluateExpr(fourthOrderMatch.group(3), scope);
+                Wrapper left = evaluateExpr(fourthOrderMatch.group(1).strip(), scope, tempPC, funcVarList);
+                Wrapper right = evaluateExpr(fourthOrderMatch.group(3).strip(), scope, tempPC, funcVarList);
 
                 String operator = fourthOrderMatch.group(2).strip();
                 if (operator.equals("+")) {
@@ -408,7 +368,9 @@ public class Translator {
                         System.exit(1);
                     }
 
-                    return new Wrapper(left.add(right));
+                    Wrapper temp =  new Wrapper(left.add(right));
+                    temp.setProgramCounter(tempPC);
+                    return temp;
                 }
 
                 if (operator.equals("-")) {
@@ -418,10 +380,14 @@ public class Translator {
                         System.exit(1);
                     }
 
-                    return new Wrapper(left.sub(right));
+                    Wrapper temp =  new Wrapper(left.sub(right));
+                    temp.setProgramCounter(tempPC);
+                    return temp;
                 }
+            } else if (funcMatch.find() && funcMatch.group(0).length() == expr.length()) {
+                return handleFuncUse(funcMatch.group(1), funcMatch.group(2), scope, tempPC, funcVarList);
             } else {
-                System.err.println("Parsing Error: Invalid Expression: " + expr);
+                System.err.println("Syntax Error executing line " + (tempPC + 1) + " (Invalid expression): " + expr);
                 System.exit(1);
             }
         }
@@ -429,49 +395,71 @@ public class Translator {
         return null;
     }
 
-    public static int handleAssg(String left, String right, int scope) {
-        // x + y => 5 + 3 = 8
-        // varList.put(left, right);
-        // Evaluate right
-        // Possible things: +,-,/,*,and,or,xor,not,==,<,>,<=,>=,func call, values,[]
-        Wrapper val = evaluateExpr(right, scope);
+    public static Wrapper handleAssg(String left, String right, int scope, int blockPc, HashMap<String, Wrapper> funcVarList) {
+        Wrapper val = evaluateExpr(right, scope, pc, funcVarList);
         varList.put(left, val);
-        return 0;
+        val.setProgramCounter(blockPc);
+        return val;
     }
 
-    public static int handleSay(String type, String operand, int scope) {
+    public static Wrapper handleSay(String type, String operand, int scope, int blockPc, HashMap<String, Wrapper> funcVarList) {
         // Say/SaySame, [toPrint]
-        // Say "Amy", x
-        String[] items = operand.split("(?:, |,)");
+        // Say "Amy Paul", add 1, 2
+        Pattern funcCall = Pattern.compile("(\\b[a-z]+[A-Za-z0-9]*\\b) ?(([^,]*,?)*)");
+        Matcher funcMatch = funcCall.matcher(operand);
+        String[] items;
+        if (funcMatch.find() && funcList.get(funcMatch.group(1)) != null) {
+            String[] nonFunc = operand.split(funcMatch.group(0));
+            String[] temp = nonFunc[0].split("(?:, |,)");
+            items = new String[temp.length + 1];
+            for (int i = 0; i < temp.length; i++) {
+                items[i] = temp[i];
+            }
+
+            items[items.length - 1] = funcMatch.group(0);
+        } else {
+            items = operand.split("(?:, |,)");
+        }
+
         String printable = "";
         for (String item : items) {
-            Wrapper toPrint = evaluateExpr(item, scope);
+            Wrapper toPrint = evaluateExpr(item, scope, pc, funcVarList);
             printable += toPrint.toString() + " ";
         }
 
         printable = printable.strip();
 
         if (type.equals("Say")) {
-            System.out.print(printable);
-        }
-
-        if (type.equals("SaySame")) {
             System.out.println(printable);
         }
 
-        return 0;
+        if (type.equals("SaySame")) {
+            System.out.print(printable);
+        }
+
+        Wrapper retval = new Wrapper();
+        retval.setProgramCounter(blockPc);
+
+        return retval;
     }
 
-    public static int handleFuncDecl(String name, String parameters, int pc) {
+    public static int handleFuncDecl(String name, String parameters, int scope) {
         // parameters: x, y, z, a, b, c
         HashMap<String, Wrapper> localVarList = new HashMap<String, Wrapper>();
         DynamicArray<String> localLines = new DynamicArray<String>();
+        DynamicArray<Integer> lineNumbers = new DynamicArray<Integer>();
         DynamicArray<String> paramOrder = new DynamicArray<String>();
         Stack<Integer> blocks = new Stack<Integer>();
-        for (int i = pc + 1; !(lines.get(i).equals("End") && blocks.empty()); i++) {
-            String instr = lines.get(i);
+        for (int i = pc + 1; !(lines.get(i).contains("End") && blocks.empty()); i++) {
+            String instr = lines.get(i).strip();
+            if (instr.equals("")) {
+                pc++;
+                continue;
+            }
+
+            lineNumbers.insert(i);
             localLines.insert(instr);
-            if (instr.contains("If") || instr.contains("While") || instr.contains("For")) {
+            if ((instr.contains("If") && !instr.contains("Else")) || instr.contains("While") || instr.contains("For")) {
                 blocks.add(1);
             }
 
@@ -480,90 +468,253 @@ public class Translator {
             }
         }
         
-        String[] indivParams = parameters.split(", ");
+        //System.out.println(parameters);
+        String[] indivParams = parameters.split("(?:, |,)");
+        int i = 0;
         for (String param : indivParams) {
+            System.out.println("Param " + i + ": " + param);
             localVarList.put(param, null);
             paramOrder.insert(param);
+            i++;
         }
 
-        Func f = new Func(name, localLines, localVarList, paramOrder);
+        Func f = new Func(name, localLines, localVarList, paramOrder, lineNumbers);
         funcList.put(name, f);
 
-        return pc + localLines.length;
+        return pc + localLines.length + 1;
     }
 
-    public static int handleFuncUse(String name, String parameters, int scope) {
-        // HashMap() 
-        // for (variable in array) hashmap.put(variable)
+    public static Wrapper handleFuncUse(String name, String parameters, int scope, int blockPc, HashMap<String, Wrapper> funcVarList) {
         Func f = funcList.get(name);
         if (f == null) {
-            System.err.println("Invalid Function " + name);
+            System.err.println("Invalid Function: " + name);
             System.exit(1);
         }
 
-        String[] indivParams = parameters.split(", ");
-        if (indivParams.length != f.paramOrder.size()) {
-            // Syntax error
-            System.err.println("Incorrect number of parameters for Function " + name);
-            System.err.println("You gave: " + indivParams.length);
-            System.err.println("Should be: " + f.paramOrder.size());
-            System.exit(1);
+        if (!parameters.equals("")) {
+            Pattern funcCall = Pattern.compile("(\\b[a-z]+[A-Za-z0-9]*\\b) ?(([^,]*,?)*)");
+            Matcher funcMatch = funcCall.matcher(parameters);
+            System.out.println(parameters);
+            String[] indivParams;
+            if (funcMatch.find()) {
+                String[] nonFunc = parameters.split(funcMatch.group(0));
+                String[] temp = nonFunc[0].split("(?:, |,)");
+                indivParams = new String[temp.length + 1];
+                for (int i = 0; i < temp.length; i++) {
+                    indivParams[i] = temp[i];
+                }
+
+                indivParams[indivParams.length - 1] = funcMatch.group(0);
+            } else {
+                indivParams = parameters.split("(?:, |,)");
+            }
+
+            for (String param: indivParams) System.out.println(param);
+
+            if (indivParams.length != f.paramOrder.size()) {
+                // Syntax error
+                System.err.println("Incorrect number of parameters for Function " + name);
+                System.err.println("You gave: " + indivParams.length);
+                System.err.println("Should be: " + f.paramOrder.size());
+                System.exit(1);
+            }
+
+            // Add params to function
+            for (int i = 0; i < indivParams.length; i++) {
+                // Pass to evaluateExpr
+                String paramName = f.paramOrder.get(i);
+                Wrapper value = evaluateExpr(indivParams[i].strip(), scope, pc, f.varList);
+                f.varList.put(paramName, value);
+            }
         }
 
-        // Add params to function
-        for (int i = 0; i < indivParams.length; i++) {
-            // Pass to evaluateExpr
-            String paramName = f.paramOrder.get(i);
-            Wrapper value = evaluateExpr(indivParams[i], scope);
-            f.varList.put(paramName, value);
+        HashMap<String, Wrapper> newFuncList = new HashMap<String, Wrapper>();
+        if (funcVarList != null) {
+            newFuncList.putAll(funcVarList);
         }
 
-        // Run Function block
-        for (String line : f.lines) {
-            parseString(line, 0, true, scope);
-        }
+        newFuncList.putAll(f.varList);
 
-        return 0;
-    }
-
-    public static int handleCondFirst(String condition, int pc) {
-        return 0;
-    }
-    
-    public static int handleCondElse(String condition, int pc) {
-        return 0;
-    }
-
-    public static int handleEnd() {
-        // Throw error?
-        return 0;
-    }
-
-    public static int handleWhileFirst(String condition, int pc) {
-        return 0;
-    }
-
-    public static int handleForFirst(String varName, String start, String end, int pc) {
+        Wrapper retval = new Wrapper();
         
-        return 0;
-    }
+        // Run Function block
+        for (int i = 0; i < f.lines.size(); i++) {
+            retval = parseString(f.lines.get(i), scope, f.lineNumbers.get(i), newFuncList);
+            i = retval.getProgramCounter()-f.lineNumbers.get(0);
+            //System.out.println(retval.getProgramCounter());
+            //System.out.println(i);
+        }
 
-    public static Wrapper handleReturnStat(String expr, int pc) {
-        // CHECK 
-        Wrapper retval = evaluateExpr(expr);
+        retval.setProgramCounter(blockPc);
         return retval;
     }
 
-/*    public static boolean validAssignment(String str) {
-        // "String"
-        // True/False
-        //[Array]
-        // 6, 6/2
-        // add 1,2
-        // return str != null && 
+    public static Wrapper handleCondFirst(String condition, int scope, int blockPc, HashMap<String, Wrapper> funcVarList) {
+        Wrapper cond = evaluateExpr(condition, scope, pc, funcVarList);
+
+        Stack<Integer> blocks = new Stack<Integer>();
+        int tempPc = blockPc + 1;
+        int elseIndex = 0;
+        while (!(lines.get(tempPc).contains("End") && blocks.empty())) {
+            String instr = lines.get(tempPc).strip();
+            if (instr.equals("")) {
+                tempPc++;
+                continue;
+            }
+
+            if (instr.contains("Else") && blocks.empty() && elseIndex == 0) {
+                elseIndex = tempPc;
+            }
+
+            if ((instr.contains("If") && !instr.contains("Else")) || instr.contains("While") || instr.contains("For")) {
+                blocks.add(1);
+            }
+
+            if (instr.contains("End")) {
+                blocks.pop();
+            }
+
+            tempPc++;
+        }
+
+        if (elseIndex == 0) {
+            elseIndex = tempPc; // End index
+        }
+
+        Wrapper retval = new Wrapper();
+        if (cond.equals(new Wrapper(true))) {
+            for (int i = blockPc + 1; i < elseIndex; i++) {
+                retval = parseString(lines.get(i), scope + 1, i, funcVarList);
+            }
+
+            if (elseIndex == tempPc) {
+                blockPc = elseIndex + 1;
+            } else {
+                blockPc = elseIndex - 1; 
+            }
+
+        } else {
+            if (elseIndex == tempPc) {
+                blockPc = elseIndex + 1;
+            } else {
+                blockPc = elseIndex - 1;
+            }
+        }
+
+        retval.setProgramCounter(blockPc);
+
+        return retval;
     }
-*/
-    // Function parameters -- superimpose onto first function line
-    // Partition var: after ,
-    // func: no commas
+    
+    public static Wrapper handleCondElse(String condition, int scope, int blockPc, HashMap<String, Wrapper> funcVarList) {
+        Wrapper retval = new Wrapper();
+        if (!condition.equals("")) {
+            Pattern p = Pattern.compile("If (.*) Then");
+            Matcher matcher = p.matcher(condition);
+            if (!matcher.find() || matcher.group(0).length() != condition.length()) {
+                System.err.println("Syntax error in line " + (blockPc + 1) + " (Invalid If header): " + condition);
+                System.exit(1);
+            }
+
+            retval = handleCondFirst(matcher.group(1), scope, blockPc, funcVarList);
+        }
+
+        return retval;
+    }
+
+    public static int handleEnd(int blockPc) {
+        System.err.println("Parsing Error in line " + (blockPc + 1) + ": Unbounded End");
+        System.exit(1);
+        return -1;
+    }
+
+    public static Wrapper handleWhileFirst(String condition, int scope, int blockPc, HashMap<String, Wrapper> funcVarList) {
+        Wrapper cond = evaluateExpr(condition, scope, blockPc, funcVarList);
+        Stack<Integer> blocks = new Stack<Integer>();
+        int whileEnd = blockPc + 1;
+        while (!(lines.get(whileEnd).contains("End") && blocks.empty())) {
+            String instr = lines.get(whileEnd).strip();
+            if (instr.equals("")) {
+                whileEnd++;
+                continue;
+            }
+
+            if ((instr.contains("If") && !instr.contains("Else")) || instr.contains("While") || instr.contains("For")) {
+                blocks.add(1);
+            }
+
+            if (instr.contains("End")) {
+                blocks.pop();
+            }
+
+            whileEnd++;
+        }
+
+        Wrapper retval = new Wrapper();
+        while (cond.equals(new Wrapper(true))) {
+            for (int i = blockPc + 1; i < whileEnd; i++) {
+                retval = parseString(lines.get(i), scope, i, funcVarList);
+            }
+
+            cond = evaluateExpr(condition, scope, blockPc, funcVarList);
+        }
+
+        retval.setProgramCounter(whileEnd);
+        return retval;
+    }
+
+    public static Wrapper handleForFirst(String varName, String start, String end, int scope, int blockPc, HashMap<String, Wrapper> funcVarList) {
+        Wrapper startVal = evaluateExpr(start, scope, blockPc, funcVarList);
+        Wrapper endVal = evaluateExpr(end, scope, blockPc, funcVarList);
+        if (!startVal.isNumeric() || !endVal.isNumeric()) {
+            System.err.println("Type error in line " + (blockPc + 1) + " (Start and End loop values must be numbers)");
+            System.exit(1);
+        }
+
+        //System.out.println(varName);
+        HashMap<String, Wrapper> newFuncList = new HashMap<String, Wrapper>();
+        if (funcVarList != null) {
+            newFuncList.putAll(funcVarList);
+        }
+
+        newFuncList.put(varName, startVal);
+        //System.out.println(newFuncList);
+        Stack<Integer> blocks = new Stack<Integer>();
+        int forEnd = blockPc + 1;
+        while (!(lines.get(forEnd).contains("End") && blocks.empty())) {
+            String instr = lines.get(forEnd).strip();
+            if (instr.equals("")) {
+                forEnd++;
+                continue;
+            }
+
+            if ((instr.contains("If") && !instr.contains("Else")) || instr.contains("While") || instr.contains("For")) {
+                blocks.add(1);
+            }
+
+            if (instr.contains("End")) {
+                blocks.pop();
+            }
+
+            forEnd++;
+        }
+
+        Wrapper retval = new Wrapper();
+        while (new Wrapper(startVal.leq(endVal)).equals(new Wrapper(true))) {
+            for (int i = blockPc + 1; i < forEnd; i++) {
+                retval = parseString(lines.get(i), scope, i, newFuncList);
+            }
+
+            startVal = new Wrapper(startVal.add(new Wrapper(1))); // Increment list index
+            newFuncList.put(varName, startVal);
+        }
+
+        retval.setProgramCounter(forEnd);
+        return retval;
+    }
+
+    public static Wrapper handleReturnStat(String expr, int scope, int tempPC, HashMap<String, Wrapper> funcVarList) {
+        Wrapper retval = evaluateExpr(expr, scope, tempPC, funcVarList);
+        return retval;
+    }
 }

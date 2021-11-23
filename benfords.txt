@@ -10,7 +10,7 @@ End
 
 Func firstDigit x 
     While x > 9 
-        x = x /i 10
+        x = x / 10
     End
     Return x
 End

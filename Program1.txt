@@ -8,17 +8,23 @@ Func calcMultiples x, y, m
     index = 0
     While x * index <= m Do
         count = count + 1
+        index = index + 1
     End
 
+    //Say "After first while loop"
     index = 0
     While y * index <= m Do
         count = count + 1
+        index = index + 1
     End
+
+    Say "Hello"
     Say count
 End
 
-If Length args < 3 Or Length args > 3 // Length: initialize array to null values, find first null value
+If a# < 3 Or a# > 3 Then
     Say "This program requires 3 command line arguments."
-calcMultiples args[0], args[1], args[2]
+End
+calcMultiples 2, 5, 20
 
 

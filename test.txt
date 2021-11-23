@@ -23,8 +23,10 @@ End
 
 xFiles = 2
 Say xFiles
+xFiles = "Hi"
+Say xFiles
 //doStuff
-Say "Hi"
-doStuff
+//Say "Hi"
+//doStuff
 //Say "General Kenobi"
 //Say "Amy", add 1,2

@@ -6,7 +6,6 @@ import java.util.List;
 import java.util.ArrayList;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
-import java.util.zip.Inflater;
 
 public class Translator {
     public static HashMap<String, Wrapper> varList;
@@ -49,6 +48,7 @@ public class Translator {
 
             Wrapper pcWrap = parseString(instruction, 0, pc, null);
             pc = pcWrap.getProgramCounter();
+            System.out.println("pc in parse lines " + (pc+1));
             pc++;
         }
     }
@@ -180,6 +180,7 @@ public class Translator {
 
     public static Wrapper evaluateExpr(String expr, int scope, int tempPC, HashMap<String, Wrapper> funcVarList) {
         expr = expr.strip();
+        System.out.println(expr);
         //System.out.println(funcVarList);
 
         // Priority order: Func call, == / And / Or / Xor / Comparison, / / *, + / -
@@ -197,20 +198,22 @@ public class Translator {
             return value;
         } catch (UnsupportedTypeException e) {
             Pattern funcCall = Pattern.compile("([a-z]+) (([^,]*,?)*)");
-            Pattern secondOrder = Pattern.compile("(.*) ?((?:And|Or|Xor|==|<=|>=|<|>)) ?(.*)"); // Strip() afterward
+            Pattern boolComp = Pattern.compile("(.*) ?((?:And|Or|Xor)) ?(.*)");
+            Pattern secondOrder = Pattern.compile("(.*) ?((?:==|<=|>=|<|>)) ?(.*)"); // Strip() afterward
             Pattern not = Pattern.compile("Not (.*)");
             Pattern thirdOrder = Pattern.compile("(.*) ?((?:\\/|\\*|\\%)) ?(.*)"); // Strip()
             Pattern fourthOrder = Pattern.compile("(.*) ?((?:\\+|-)) ?(.*)"); // Strip()
             Matcher funcMatch = funcCall.matcher(expr);
+            Matcher boolCompMatch = boolComp.matcher(expr);
             Matcher secondOrderMatch = secondOrder.matcher(expr);
             Matcher notMatch = not.matcher(expr);
             Matcher thirdOrderMatch = thirdOrder.matcher(expr);
             Matcher fourthOrderMatch = fourthOrder.matcher(expr);
-            if (secondOrderMatch.find() && secondOrderMatch.group(0).length() == expr.length()) {
-                Wrapper left = evaluateExpr(secondOrderMatch.group(1).strip(), scope, tempPC, funcVarList);
-                Wrapper right = evaluateExpr(secondOrderMatch.group(3).strip(), scope, tempPC, funcVarList);
+            if (boolCompMatch.find() && boolCompMatch.group(0).length() == expr.length()) {
+                Wrapper left = evaluateExpr(boolCompMatch.group(1).strip(), scope, tempPC, funcVarList);
+                Wrapper right = evaluateExpr(boolCompMatch.group(3).strip(), scope, tempPC, funcVarList);
 
-                String operator = secondOrderMatch.group(2).strip();
+                String operator = boolCompMatch.group(2).strip();
                 if (operator.equals("And")) {
                     // Variables must be booleans
                     if (!(left.isBoolean() && right.isBoolean())) {
@@ -247,6 +250,12 @@ public class Translator {
                     temp.setProgramCounter(tempPC);
                     return temp;
                 }
+            } else if (secondOrderMatch.find() && secondOrderMatch.group(0).length() == expr.length()) {
+                Wrapper left = evaluateExpr(secondOrderMatch.group(1).strip(), scope, tempPC, funcVarList);
+                Wrapper right = evaluateExpr(secondOrderMatch.group(3).strip(), scope, tempPC, funcVarList);
+
+                String operator = secondOrderMatch.group(2).strip();
+                
 
                 if (operator.equals("==")) {
                     Wrapper temp =  new Wrapper(left.equals(right));

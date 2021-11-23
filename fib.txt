@@ -1,17 +1,15 @@
-// Program that prints out the first n fibonacci numbers
+// Program that prints out the first 10 fibonacci numbers
 
 Func fibonacci n
     If n == 0 Or n == 1 Then
         Return n
     Else
-        Return fibonacci n - 1 + fibonacci n - 2
+        temp1 = n - 1 
+        temp2 = n - 2
+        Return fibonacci temp1 + fibonacci temp2
     End
 End
-    
 
-
-Say "Enter the number of fibonacci numbers to generate:"
-n = In
-For i = 0 To n Do
+For i = 0 To 10 Do
     Say fibonacci i
 End

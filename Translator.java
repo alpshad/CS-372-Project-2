@@ -180,9 +180,12 @@ public class Translator {
 
     public static Wrapper evaluateExpr(String expr, int scope, int tempPC, HashMap<String, Wrapper> funcVarList) {
         expr = expr.strip();
+        System.out.println("expr " +expr);
+        System.out.println(funcVarList);
 
         // Priority order: Func call, == / And / Or / Xor / Comparison, / / *, + / -
         if (funcVarList != null && funcVarList.get(expr) != null) {
+            System.out.println("hi");
             return funcVarList.get(expr);
         }
         
@@ -199,7 +202,7 @@ public class Translator {
             Pattern boolComp = Pattern.compile("(.*) ?((?:And|Or|Xor)) ?(.*)");
             Pattern secondOrder = Pattern.compile("(.*) ?((?:==|<=|>=|<|>)) ?(.*)"); // Strip() afterward
             Pattern not = Pattern.compile("Not (.*)");
-            Pattern thirdOrder = Pattern.compile("(.*) ?((?:\\/|\\*|\\%)) ?(.*)"); // Strip()
+            Pattern thirdOrder = Pattern.compile("(.*) ?((?:\\^|\\/|\\*|\\%)) ?(.*)"); // Strip()
             Pattern fourthOrder = Pattern.compile("(.*) ?((?:\\+|-)) ?(.*)"); // Strip()
             Matcher funcMatch = funcCall.matcher(expr);
             Matcher boolCompMatch = boolComp.matcher(expr);
@@ -363,6 +366,18 @@ public class Translator {
                     temp.setProgramCounter(tempPC);
                     return temp;
                 }
+
+                if (operator.equals("^")) {
+                    if (!(left.isNumeric() && right.isNumeric())) {
+                        // Error
+                        System.err.println("Type error: ^ must be used on numeric types");
+                        System.exit(1);
+                    }
+
+                    Wrapper temp = new Wrapper(left.pow(right));
+                    temp.setProgramCounter(tempPC);
+                    return temp;
+                }
             } else if (fourthOrderMatch.find() && fourthOrderMatch.group(0).length() == expr.length()) {
                 Wrapper left = evaluateExpr(fourthOrderMatch.group(1).strip(), scope, tempPC, funcVarList);
                 Wrapper right = evaluateExpr(fourthOrderMatch.group(3).strip(), scope, tempPC, funcVarList);
@@ -412,6 +427,7 @@ public class Translator {
     public static Wrapper handleSay(String type, String operand, int scope, int blockPc, HashMap<String, Wrapper> funcVarList) {
         // Say/SaySame, [toPrint]
         // Say "Amy Paul", add 1, 2
+        System.out.println(funcVarList);
         Pattern funcCall = Pattern.compile("(\\b[a-z]+[A-Za-z0-9]*\\b) ?(([^,]*,?)*)");
         Matcher funcMatch = funcCall.matcher(operand);
         String[] items;
@@ -434,6 +450,7 @@ public class Translator {
 
         String printable = "";
         for (String item : items) {
+            System.out.println(item);
             Wrapper toPrint = evaluateExpr(item, scope, blockPc, funcVarList);
             printable += toPrint.toString() + " ";
         }
@@ -491,6 +508,7 @@ public class Translator {
 
     public static Wrapper handleFuncUse(String name, String parameters, int scope, int blockPc, HashMap<String, Wrapper> funcVarList) {
         Func f = funcList.get(name);
+        System.out.println(name);
         if (f == null) {
             System.err.println("Invalid Function: " + name);
             System.exit(1);
@@ -500,7 +518,8 @@ public class Translator {
             Pattern funcCall = Pattern.compile("(\\b[a-z]+[A-Za-z0-9]*\\b) ?(([^,]*,?)*)");
             Matcher funcMatch = funcCall.matcher(parameters);
             String[] indivParams;
-            if (funcMatch.find()) {
+            if (funcMatch.find() && funcList.get(funcMatch.group(1)) != null) {
+                System.out.println(funcMatch.group(0));
                 String[] nonFunc = parameters.split(funcMatch.group(0));
                 if (nonFunc.length == 0) {
                     indivParams = parameters.split("(?:, |,)");
@@ -517,6 +536,8 @@ public class Translator {
                 indivParams = parameters.split("(?:, |,)");
             }
 
+            for (String item:indivParams)System.out.println("item " +item);
+
             if (indivParams.length != f.paramOrder.size()) {
                 // Syntax error
                 System.err.println("Incorrect number of parameters for Function " + name);
@@ -529,7 +550,7 @@ public class Translator {
             for (int i = 0; i < indivParams.length; i++) {
                 // Pass to evaluateExpr
                 String paramName = f.paramOrder.get(i);
-                Wrapper value = evaluateExpr(indivParams[i].strip(), scope, pc, f.varList);
+                Wrapper value = evaluateExpr(indivParams[i].strip(), scope, pc, funcVarList);
                 f.varList.put(paramName, value);
             }
         }

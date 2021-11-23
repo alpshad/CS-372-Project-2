@@ -2,7 +2,6 @@ public class Wrapper {
     private Type varType;
     private Object value;
     private int pc;
-    private DynamicArray<Wrapper> array;
     private int scope; // 0 is global, then add 1 for each inner scope
     public boolean funcReturn;
 
@@ -165,6 +164,10 @@ public class Wrapper {
 
     public Object sub(Wrapper other) {
         return this.getNumericValue() - other.getNumericValue();
+    }
+
+    public Object pow(Wrapper other) {
+        return (int) Math.pow(this.getNumericValue(), other.getNumericValue());
     }
 
     @Override

@@ -48,7 +48,7 @@ public class Translator {
 
             Wrapper pcWrap = parseString(instruction, 0, pc, null);
             pc = pcWrap.getProgramCounter();
-            System.out.println("pc in parse lines " + (pc+1));
+            //System.out.println("pc in parse lines " + (pc+1));
             pc++;
         }
     }
@@ -96,7 +96,9 @@ public class Translator {
                 System.exit(1);
             }
 
-            return handleReturnStat(returnStatMatch.group(1), scope, tempPC, funcVarList);
+            Wrapper temp = handleReturnStat(returnStatMatch.group(1), scope, tempPC, funcVarList);
+            temp.setReturn();
+            return temp;
         } else if (funcDeclMatch.find()) {
             // Function Declaration
             if (!funcDeclMatch.group(0).equals(instruction)) {
@@ -197,7 +199,7 @@ public class Translator {
             Wrapper value = new Wrapper(expr);
             return value;
         } catch (UnsupportedTypeException e) {
-            Pattern funcCall = Pattern.compile("([a-z]+) (([^,]*,?)*)");
+            Pattern funcCall = Pattern.compile("(\\b[a-z]+[A-Za-z0-9]*\\b) ?(([^,]*,? ?)*)");
             Pattern boolComp = Pattern.compile("(.*) ?((?:And|Or|Xor)) ?(.*)");
             Pattern secondOrder = Pattern.compile("(.*) ?((?:==|<=|>=|<|>)) ?(.*)"); // Strip() afterward
             Pattern not = Pattern.compile("Not (.*)");
@@ -394,8 +396,10 @@ public class Translator {
                     return temp;
                 }
             } else if (funcMatch.find() && funcMatch.group(0).length() == expr.length()) {
+                System.out.println("Func match");
                 return handleFuncUse(funcMatch.group(1), funcMatch.group(2), scope, tempPC, funcVarList);
             } else {
+                System.out.println("Why");
                 System.err.println("Syntax Error executing line " + (tempPC + 1) + " (Invalid expression): " + expr);
                 System.exit(1);
             }
@@ -419,20 +423,25 @@ public class Translator {
         String[] items;
         if (funcMatch.find() && funcList.get(funcMatch.group(1)) != null) {
             String[] nonFunc = operand.split(funcMatch.group(0));
-            String[] temp = nonFunc[0].split("(?:, |,)");
-            items = new String[temp.length + 1];
-            for (int i = 0; i < temp.length; i++) {
-                items[i] = temp[i];
+            if (nonFunc.length == 0) {
+                items = operand.split("(?:, |,)");
+                for (String item : items) System.out.println(item);
+            } else {
+                String[] temp = nonFunc[0].split("(?:, |,)");
+                items = new String[temp.length + 1];
+                for (int i = 0; i < temp.length; i++) {
+                    items[i] = temp[i];
+                }
+    
+                items[items.length - 1] = funcMatch.group(0);
             }
-
-            items[items.length - 1] = funcMatch.group(0);
         } else {
             items = operand.split("(?:, |,)");
         }
 
         String printable = "";
         for (String item : items) {
-            Wrapper toPrint = evaluateExpr(item, scope, pc, funcVarList);
+            Wrapper toPrint = evaluateExpr(item, scope, blockPc, funcVarList);
             printable += toPrint.toString() + " ";
         }
 
@@ -448,6 +457,7 @@ public class Translator {
 
         Wrapper retval = new Wrapper();
         retval.setProgramCounter(blockPc);
+        //System.out.println("Say block pc " +(blockPc+1));
 
         return retval;
     }
@@ -459,12 +469,8 @@ public class Translator {
         DynamicArray<Integer> lineNumbers = new DynamicArray<Integer>();
         DynamicArray<String> paramOrder = new DynamicArray<String>();
         Stack<Integer> blocks = new Stack<Integer>();
-        for (int i = pc + 1; !(lines.get(i).contains("End") && blocks.empty()); i++) {
+        for (int i = pc + 1; i < lines.size() && !(lines.get(i).contains("End") && blocks.empty()); i++) {
             String instr = lines.get(i).strip();
-            if (instr.equals("")) {
-                pc++;
-                continue;
-            }
 
             lineNumbers.insert(i);
             localLines.insert(instr);
@@ -481,11 +487,13 @@ public class Translator {
         String[] indivParams = parameters.split("(?:, |,)");
         int i = 0;
         for (String param : indivParams) {
-            System.out.println("Param " + i + ": " + param);
+            //System.out.println("Param " + i + ": " + param);
             localVarList.put(param, null);
             paramOrder.insert(param);
             i++;
         }
+
+        //for (String line : localLines) System.out.println(line);
 
         Func f = new Func(name, localLines, localVarList, paramOrder, lineNumbers);
         funcList.put(name, f);
@@ -507,13 +515,17 @@ public class Translator {
             String[] indivParams;
             if (funcMatch.find()) {
                 String[] nonFunc = parameters.split(funcMatch.group(0));
-                String[] temp = nonFunc[0].split("(?:, |,)");
-                indivParams = new String[temp.length + 1];
-                for (int i = 0; i < temp.length; i++) {
-                    indivParams[i] = temp[i];
+                if (nonFunc.length == 0) {
+                    indivParams = parameters.split("(?:, |,)");
+                } else {
+                    String[] temp = nonFunc[0].split("(?:, |,)");
+                    indivParams = new String[temp.length + 1];
+                    for (int i = 0; i < temp.length; i++) {
+                        indivParams[i] = temp[i];
+                    }
+    
+                    indivParams[indivParams.length - 1] = funcMatch.group(0);
                 }
-
-                indivParams[indivParams.length - 1] = funcMatch.group(0);
             } else {
                 indivParams = parameters.split("(?:, |,)");
             }
@@ -547,8 +559,18 @@ public class Translator {
         Wrapper retval = new Wrapper();
         
         // Run Function block
+        //System.out.println("first line " + f.lineNumbers.get(0));
+        //System.out.println(f.lines.size());
         for (int i = 0; i < f.lines.size(); i++) {
+            if (f.lines.get(i).equals("")) {
+                continue;
+            }
             retval = parseString(f.lines.get(i), scope, f.lineNumbers.get(i), newFuncList);
+            if (retval.funcReturn) {
+                System.out.println("returning");
+                break;
+            }
+
             i = retval.getProgramCounter()-f.lineNumbers.get(0);
             //System.out.println(retval.getProgramCounter());
             //System.out.println(i);
@@ -594,17 +616,21 @@ public class Translator {
         if (cond.equals(new Wrapper(true))) {
             for (int i = blockPc + 1; i < elseIndex; i++) {
                 retval = parseString(lines.get(i), scope + 1, i, funcVarList);
+                if (retval.funcReturn) {
+                    System.out.println("returning");
+                    break;
+                }
             }
 
             if (elseIndex == tempPc) {
-                blockPc = elseIndex + 1;
+                blockPc = elseIndex;
             } else {
                 blockPc = elseIndex - 1; 
             }
 
         } else {
             if (elseIndex == tempPc) {
-                blockPc = elseIndex + 1;
+                blockPc = elseIndex;
             } else {
                 blockPc = elseIndex - 1;
             }
@@ -643,7 +669,9 @@ public class Translator {
         int whileEnd = blockPc + 1;
         while (!(lines.get(whileEnd).contains("End") && blocks.empty())) {
             String instr = lines.get(whileEnd).strip();
+            //System.out.println("Instr " +instr);
             if (instr.equals("")) {
+                //System.out.println("Whitespace");
                 whileEnd++;
                 continue;
             }
@@ -663,11 +691,21 @@ public class Translator {
         while (cond.equals(new Wrapper(true))) {
             for (int i = blockPc + 1; i < whileEnd; i++) {
                 retval = parseString(lines.get(i), scope, i, funcVarList);
+                if (retval.funcReturn) {
+                    System.out.println("returning");
+                    break;
+                }
+            }
+
+            if (retval.funcReturn) {
+                System.out.println("returning");
+                break;
             }
 
             cond = evaluateExpr(condition, scope, blockPc, funcVarList);
         }
 
+        //System.out.println("WhileEnd "+ (whileEnd+1));
         retval.setProgramCounter(whileEnd);
         return retval;
     }
@@ -712,6 +750,15 @@ public class Translator {
         while (new Wrapper(startVal.leq(endVal)).equals(new Wrapper(true))) {
             for (int i = blockPc + 1; i < forEnd; i++) {
                 retval = parseString(lines.get(i), scope, i, newFuncList);
+                if (retval.funcReturn) {
+                    System.out.println("returning");
+                    break;
+                }
+            }
+
+            if (retval.funcReturn) {
+                System.out.println("returning");
+                break;
             }
 
             startVal = new Wrapper(startVal.add(new Wrapper(1))); // Increment list index
@@ -724,6 +771,8 @@ public class Translator {
 
     public static Wrapper handleReturnStat(String expr, int scope, int tempPC, HashMap<String, Wrapper> funcVarList) {
         Wrapper retval = evaluateExpr(expr, scope, tempPC, funcVarList);
+        retval.setReturn();
+        System.out.println("In handle return");
         return retval;
     }
 }

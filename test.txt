@@ -4,21 +4,16 @@ End
 
 Func doStuff
     Say "Beginning"
-    // z = 200
-    // If z == 2 Then
-    //    Say "Hello"
-    // Else If z == 5 Then
-    //  Say "There"
-    // Else If z == "Hi" Then
-    //  Say "Tooooooooo"
-    // Else If z == 20 Then
-    //  Say "Star Wars"
-    // End
-    Say "Hi"
-    Say xFiles
-    For x = 1 To 10 Do
-        Say x
-    End 
+    z = 200
+    If z == 2 Then
+        Say "Hello"
+    Else If z == 5 Then
+        Say "There"
+    Else If z == "Hi" Then
+        Say "Tooooooooo"
+    Else If z == 20 Then
+        Say "Star Wars"
+    End
 End
 
 xFiles = 2
@@ -27,6 +22,6 @@ xFiles = "Hi"
 Say xFiles
 //doStuff
 //Say "Hi"
-//doStuff
+doStuff
 //Say "General Kenobi"
 //Say "Amy", add 1,2

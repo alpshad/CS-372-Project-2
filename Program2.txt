@@ -1,0 +1,25 @@
+Func isPrime x
+    If x < 0 Then
+        Return "Error: x must be non-negative."
+    End
+
+    If x < 2 Then
+        Return "Prime"
+    End
+
+    Say x - 1
+    For i = 2 To x - 1 Do
+        Say "i", i
+        If x % i == 0 Then
+            Return "Not Prime"
+        End
+    End
+
+    Return "Prime"
+End
+
+If a# < 1 Or a# > 1 Then
+    Say "This program requires 1 command line argument"
+End
+
+Say isPrime a1

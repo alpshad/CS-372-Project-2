@@ -4,6 +4,7 @@ public class Wrapper {
     private int pc;
     private DynamicArray<Wrapper> array;
     private int scope; // 0 is global, then add 1 for each inner scope
+    public boolean funcReturn;
 
     public Wrapper() { }
 
@@ -71,6 +72,10 @@ public class Wrapper {
 
     public int getScope() {
         return this.scope;
+    }
+
+    public void setReturn() {
+        this.funcReturn = true;
     }
 
     public boolean isNumeric() {

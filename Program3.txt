@@ -1,4 +1,4 @@
-// Program that throws a parse error due to miss End-statements
+// Program that throws a parse error due to an invalid function name (must be camelCase)
 
 Func AddTwoOdds x, y
     If x % 2 == 0 Or y % 2 == 0

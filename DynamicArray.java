@@ -30,10 +30,6 @@ public class DynamicArray<T> implements Iterable<T> {
         }
     }
 
-    /* public T remove(int index) {
-        // AMY DOES BECAUSE SHE'S LAZY
-    } */
-
     public T get(int index) {
         return this.array[index];
     }
@@ -41,7 +37,7 @@ public class DynamicArray<T> implements Iterable<T> {
     public int indexOf(T item) {
         for (int i = 0; i < this.length; i++) {
             if (this.array[i].equals(item)) {
-
+                return i;
             }
         }
         return -1;

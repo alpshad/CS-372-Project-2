@@ -1,0 +1,9 @@
+// Program that throws a parse error due to miss End-statements
+
+Func AddTwoOdds x, y
+    If x % 2 == 0 Or y % 2 == 0
+        Say "You can only add odd numbers."
+    retval = x + y
+    Return retval
+
+AddTwoOdds 2, 5

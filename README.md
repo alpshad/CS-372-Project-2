@@ -22,3 +22,14 @@ From the project root, run `javac *.java` followed by `java Translator <filename
 
 #### Link to the Wiki for Further Information and Documentation
 https://github.com/alpshad/CS-372-Project-2/wiki/Welcome-Page
+
+#### Project Extra Credit
+Here is a list of the add-ons we have done:
+- Complete support for Functions
+- A full typing system (See the Wrapper class)
+- Exponents (10 ^ 2 = 100, for example)
+- A homemade ArrayList so as not to rely on Java (DynamicArray)
+- An interpreted programming language rather than compiled 
+- Single-line comments
+
+We hope you enjoy!

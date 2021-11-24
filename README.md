@@ -31,5 +31,6 @@ Here is a list of the add-ons we have done:
 - A homemade ArrayList so as not to rely on Java (DynamicArray)
 - An interpreted programming language rather than compiled 
 - Single-line comments
+- Xor
 
 We hope you enjoy!

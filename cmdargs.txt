@@ -1,1 +1,0 @@
-SaySame a1, a2

@@ -1,3 +1,10 @@
+/*
+    Author: Amy Paul, Elijah Acuna
+    Course: CSc 372, Fall 2021
+    Purpose: The Java translator for the SIMPLE programming language.
+    Advances through the lines of the program and executes them sequentially
+    using Regex and various functions.
+*/
 import java.io.*;
 import java.util.Scanner;
 import java.util.Stack;
@@ -20,7 +27,10 @@ public class Translator {
             Scanner scan = new Scanner(program);
             lines = new ArrayList<String>();
 
-            while (scan.hasNextLine()) lines.add(scan.nextLine());
+            while (scan.hasNextLine()) {
+                lines.add(scan.nextLine());
+            }
+
             scan.close();
 
             // Add command line args to the list of variables
@@ -52,10 +62,10 @@ public class Translator {
         }
     }
 
+    // Parse a string into its category of expression so it can be executed properly
     public static Wrapper parseString(String instruction, int scope, int tempPC, HashMap<String, Wrapper> funcVarList) {
-        //System.out.println("Instruction: " + instruction);
-        //System.out.println("Temp pc: "+(tempPC+1));
         instruction = instruction.strip();
+        // Match with regex
         Pattern assignment = Pattern.compile("(\\b[a-z]+[A-Za-z0-9]*\\b) ?= ?(.+)");
         Pattern say = Pattern.compile("((?:Say|SaySame)) (.*)");
         Pattern funcDecl = Pattern.compile("Func (\\b[a-z]+[A-Za-z0-9]*\\b) ?(([a-z]+[^,]*,? ?)*)"); // Then split on commas
@@ -78,6 +88,7 @@ public class Translator {
         Matcher forFirstMatch = forFirst.matcher(instruction);
         Matcher returnStatMatch = returnStat.matcher(instruction);
 
+        // Find correct category
         if (instruction.startsWith("//")) {
             return new Wrapper(0, tempPC);
         } else if (sayMatch.find()) {
@@ -174,14 +185,12 @@ public class Translator {
         return new Wrapper(0, tempPC);
     }
 
-    public static boolean isNumeric(String str) {
-        return str != null && str.matches("-?\\d+");
-    }
-
+    // Evaluate a single expression from a string into its true value
     public static Wrapper evaluateExpr(String expr, int scope, int tempPC, HashMap<String, Wrapper> funcVarList) {
         expr = expr.strip();
 
         // Priority order: Func call, == / And / Or / Xor / Comparison, / / *, + / -
+        // Check if variable
         if (funcVarList != null && funcVarList.get(expr) != null) {
             return funcVarList.get(expr);
         }
@@ -192,9 +201,12 @@ public class Translator {
         }
 
         try {
+            // Expr is an actual value already
             Wrapper value = new Wrapper(expr);
             return value;
         } catch (UnsupportedTypeException e) {
+            // Evaluate further
+            // Match with regex
             Pattern funcCall = Pattern.compile("(\\b[a-z]+[A-Za-z0-9]*\\b) ?(([^,]*,? ?)*)");
             Pattern boolComp = Pattern.compile("(.*) ?((?:And|Or|Xor)) ?(.*)");
             Pattern secondOrder = Pattern.compile("(.*) ?((?:==|<=|>=|<|>)) ?(.*)"); // Strip() afterward
@@ -414,6 +426,7 @@ public class Translator {
         return null;
     }
 
+    // Parse variable assignments
     public static Wrapper handleAssg(String left, String right, int scope, int blockPc, HashMap<String, Wrapper> funcVarList) {
         Wrapper val = evaluateExpr(right, scope, pc, funcVarList);
         varList.put(left, val);
@@ -421,9 +434,8 @@ public class Translator {
         return val;
     }
 
+    // Parse print statements
     public static Wrapper handleSay(String type, String operand, int scope, int blockPc, HashMap<String, Wrapper> funcVarList) {
-        // Say/SaySame, [toPrint]
-        // Say "Amy Paul", add 1, 2
         Pattern funcCall = Pattern.compile("(\\b[a-z]+[A-Za-z0-9]*\\b) ?(([^,]*,?)*)");
         Matcher funcMatch = funcCall.matcher(operand);
         String[] items;
@@ -466,8 +478,8 @@ public class Translator {
         return retval;
     }
 
+    // Parse function declarations
     public static int handleFuncDecl(String name, String parameters, int scope) {
-        // parameters: x, y, z, a, b, c
         HashMap<String, Wrapper> localVarList = new HashMap<String, Wrapper>();
         DynamicArray<String> localLines = new DynamicArray<String>();
         DynamicArray<Integer> lineNumbers = new DynamicArray<Integer>();
@@ -501,6 +513,7 @@ public class Translator {
         return pc + localLines.length + 1;
     }
 
+    // Parse function usages
     public static Wrapper handleFuncUse(String name, String parameters, int scope, int blockPc, HashMap<String, Wrapper> funcVarList) {
         Func f = funcList.get(name);
         if (f == null) {
@@ -573,6 +586,7 @@ public class Translator {
         return retval;
     }
 
+    // Parse conditionals
     public static Wrapper handleCondFirst(String condition, int scope, int blockPc, HashMap<String, Wrapper> funcVarList) {
         Wrapper cond = evaluateExpr(condition, scope, pc, funcVarList);
 
@@ -633,6 +647,7 @@ public class Translator {
         return retval;
     }
     
+    // Parse else statements
     public static Wrapper handleCondElse(String condition, int scope, int blockPc, HashMap<String, Wrapper> funcVarList) {
         Wrapper retval = new Wrapper();
         if (!condition.equals("")) {
@@ -651,12 +666,14 @@ public class Translator {
         return retval;
     }
 
+    // Random End statement in code
     public static int handleEnd(int blockPc) {
         System.err.println("Parsing Error in line " + (blockPc + 1) + ": Unbounded End");
         System.exit(1);
         return -1;
     }
 
+    // Parse While statement
     public static Wrapper handleWhileFirst(String condition, int scope, int blockPc, HashMap<String, Wrapper> funcVarList) {
         Wrapper cond = evaluateExpr(condition, scope, blockPc, funcVarList);
         Stack<Integer> blocks = new Stack<Integer>();
@@ -701,6 +718,7 @@ public class Translator {
         return retval;
     }
 
+    // Parse For loops
     public static Wrapper handleForFirst(String varName, String start, String end, int scope, int blockPc, HashMap<String, Wrapper> funcVarList) {
         Wrapper startVal = evaluateExpr(start, scope, blockPc, funcVarList);
         Wrapper endVal = evaluateExpr(end, scope, blockPc, funcVarList);
@@ -758,6 +776,7 @@ public class Translator {
         return retval;
     }
 
+    // Parse Return statements -- return from function
     public static Wrapper handleReturnStat(String expr, int scope, int tempPC, HashMap<String, Wrapper> funcVarList) {
         Wrapper retval = evaluateExpr(expr, scope, tempPC, funcVarList);
         retval.setReturn();

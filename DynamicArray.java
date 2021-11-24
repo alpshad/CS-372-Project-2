@@ -1,3 +1,8 @@
+/*
+    Author: Amy Paul, Elijah Acuna
+    Course: CSc 372, Fall 2021
+    Purpose: A homemade ArrayList class for use in our Translator program.
+*/
 import java.util.Iterator;
 
 @SuppressWarnings("unchecked")

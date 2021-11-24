@@ -1,3 +1,10 @@
+/*
+    Author: Amy Paul, Elijah Acuna
+    Course: CSc 372, Fall 2021
+    Purpose: A type aggregate class that parses values into either NUMERIC,
+    STRING, or BOOLEAN types and performs operations on them, allowing for a 
+    dynamic typing system.
+*/
 public class Wrapper {
     private Type varType;
     private Object value;
@@ -8,14 +15,8 @@ public class Wrapper {
     public Wrapper() { }
 
     public Wrapper(Object value) {
-        // Check type
-        // Could come as "6", 6, ""Hello"", "[1,2,3,4]"
-        // if Translator.isNumeric(value)
         if (value instanceof String) {
-            // Check type
-            // String: Anything starting and ending with a quote
-            // int: Anything numeric
-            // Boolean: True or False
+            // Unsure of true type, must parse
             String str = (String) value;
             if (str != null && str.startsWith("\"") && str.endsWith("\"")) {
                 // String
@@ -69,10 +70,12 @@ public class Wrapper {
         return (other.varType == this.varType) && (other.value.equals(this.value));
     }
 
+    // Returns variable scope, either block or global
     public int getScope() {
         return this.scope;
     }
 
+    // Sets whether the value is from a function return
     public void setReturn() {
         this.funcReturn = true;
     }

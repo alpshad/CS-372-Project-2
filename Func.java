@@ -1,3 +1,9 @@
+/*
+    Author: Amy Paul, Elijah Acuna
+    Course: CSc 372, Fall 2021
+    Purpose: Holds a function definition with its lines of code, program
+    counters, name, and parameters.
+*/
 import java.util.HashMap;
 
 public class Func {

@@ -19,3 +19,6 @@ From the project root, run `javac *.java` followed by `java Translator <filename
 `While Loops and For Loops`
 `Printing to output (terminal)`
 `Command Line Arguments`
+
+#### Link to the Wiki for Further Information and Documentation
+https://github.com/alpshad/CS-372-Project-2/wiki/Welcome-Page

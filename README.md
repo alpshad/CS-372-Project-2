@@ -1,4 +1,4 @@
-# CS-372-Project-2
+# SIMPLE - a CS 372 Project
 ## Introduction
 
 **SIMPLE** is an interpreted, dynamically typed programming language for pseudocode-like programming. Its style and syntax are inspired by Ruby and Python. 
